@@ -1,8 +1,18 @@
 import Image from "next/image";
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/server'
 
-export default function Home() {
+export default async function Home() {
+  // Check if user is authenticated and redirect to dashboard
+  const supabase = await createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  if (session) {
+    redirect('/dashboard')
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
+    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 bg-violet-50/30">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <Image
           className="dark:invert"
