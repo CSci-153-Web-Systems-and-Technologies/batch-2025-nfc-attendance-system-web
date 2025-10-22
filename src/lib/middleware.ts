@@ -13,7 +13,7 @@ const publicRoutes = [
   '/error',
 ]
 
-// Define auth routes that should redirect to dashboard if user is already logged in
+// Define auth routes that should redirect to authenticated area if user is already logged in
 const authRoutes = [
   '/login',
   '/sign-up',
