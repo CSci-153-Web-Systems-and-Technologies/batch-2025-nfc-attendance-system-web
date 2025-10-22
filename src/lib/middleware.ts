@@ -19,6 +19,9 @@ const authRoutes = [
   '/sign-up',
 ]
 
+// Route that doesn't require profile completion
+const profileCompletionRoute = '/complete-profile'
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -59,6 +62,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isAuthRoute = authRoutes.some(route => pathname === route)
+  const isProfileCompletionRoute = pathname === profileCompletionRoute
 
   // If user is authenticated and trying to access auth pages, redirect to protected area
   if (user && isAuthRoute) {
@@ -74,6 +78,24 @@ export async function updateSession(request: NextRequest) {
     // Add the original URL as a redirect parameter so we can redirect back after login
     url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // Check if authenticated user has completed their profile
+  // Skip check if already on complete-profile page or on public routes
+  if (user && !isPublicRoute && !isProfileCompletionRoute) {
+    // Check if user has a profile in the database
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.sub)
+      .single()
+
+    // If no profile exists, redirect to complete-profile
+    if (!userProfile) {
+      const url = request.nextUrl.clone()
+      url.pathname = profileCompletionRoute
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
