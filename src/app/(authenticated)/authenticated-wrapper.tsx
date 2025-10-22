@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { AuthenticatedNav } from '@/components/ui/authenticated-nav'
 
 export function AuthenticatedWrapper({
   children,
@@ -8,14 +9,14 @@ export function AuthenticatedWrapper({
   children: React.ReactNode
 }) {
   useEffect(() => {
-    // Hide sidebar for authenticated pages
+    // Hide unauthenticated sidebar for authenticated pages
     const style = document.createElement('style')
-    style.id = 'hide-sidebar'
+    style.id = 'hide-unauth-sidebar'
     style.innerHTML = `
+      body > div > aside:first-of-type {
+        display: none !important;
+      }
       @media (min-width: 768px) {
-        body > div > aside {
-          display: none !important;
-        }
         body > div > main {
           margin-left: 0 !important;
         }
@@ -30,12 +31,19 @@ export function AuthenticatedWrapper({
 
     return () => {
       // Cleanup on unmount
-      const styleEl = document.getElementById('hide-sidebar')
+      const styleEl = document.getElementById('hide-unauth-sidebar')
       if (styleEl) {
         styleEl.remove()
       }
     }
   }, [])
 
-  return <>{children}</>
+  return (
+    <>
+      <AuthenticatedNav />
+      <div className="md:ml-16 pt-16 md:pt-0">
+        {children}
+      </div>
+    </>
+  )
 }
