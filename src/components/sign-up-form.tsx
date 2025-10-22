@@ -41,11 +41,11 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       })
       if (error) throw error
-      router.push('/auth/sign-up-success')
+      router.push('/sign-up-success')
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
@@ -62,7 +62,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/confirm?next=/protected`,
+          redirectTo: `${window.location.origin}/confirm?next=/dashboard`,
         },
       })
       if (error) throw error
@@ -161,7 +161,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <Link href="/login" className="underline underline-offset-4">
                 Login
               </Link>
             </div>

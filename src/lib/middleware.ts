@@ -1,6 +1,24 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Define public routes that don't require authentication
+const publicRoutes = [
+  '/',
+  '/login',
+  '/sign-up',
+  '/sign-up-success',
+  '/forgot-password',
+  '/update-password',
+  '/confirm',
+  '/error',
+]
+
+// Define auth routes that should redirect to authenticated area if user is already logged in
+const authRoutes = [
+  '/login',
+  '/sign-up',
+]
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -38,14 +56,23 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const pathname = request.nextUrl.pathname
+  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
+  const isAuthRoute = authRoutes.some(route => pathname === route)
+
+  // If user is authenticated and trying to access auth pages, redirect to protected area
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // If user is not authenticated and trying to access protected routes
+  if (!user && !isPublicRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    // Add the original URL as a redirect parameter so we can redirect back after login
+    url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }
 
