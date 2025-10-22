@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       redirect(next)
     } else {
-      redirect(`/auth/error?error=${error?.message}`)
+      redirect(`/error?error=${error?.message}`)
     }
   }
 
@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
       redirect(next)
     } else {
       // redirect the user to an error page with some instructions
-      redirect(`/auth/error?error=${error?.message}`)
+      redirect(`/error?error=${error?.message}`)
     }
   }
 
   // redirect the user to an error page with some instructions
-  redirect(`/auth/error?error=No token hash, code, or type`)
+  redirect(`/error?error=No token hash, code, or type`)
 }
