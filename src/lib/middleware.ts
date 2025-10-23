@@ -19,6 +19,9 @@ const authRoutes = [
   '/sign-up',
 ]
 
+// Route that doesn't require profile completion
+const profileCompletionRoute = '/complete-profile'
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -47,18 +50,13 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
-  const { data } = await supabase.auth.getClaims()
-  const user = data?.claims
+  // Get authenticated user
+  const { data: { user } } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isAuthRoute = authRoutes.some(route => pathname === route)
+  const isProfileCompletionRoute = pathname === profileCompletionRoute
 
   // If user is authenticated and trying to access auth pages, redirect to protected area
   if (user && isAuthRoute) {
@@ -74,6 +72,31 @@ export async function updateSession(request: NextRequest) {
     // Add the original URL as a redirect parameter so we can redirect back after login
     url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // Check if authenticated user has completed their profile
+  // Skip check if already on complete-profile page or on public routes
+  if (user && !isPublicRoute && !isProfileCompletionRoute) {
+    // Check if user has a profile in the database
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('auth_id', user.id)
+      .maybeSingle()
+
+    console.log('[MIDDLEWARE] Checking profile for user:', user.id)
+    console.log('[MIDDLEWARE] Profile query result:', { userProfile })
+    console.log('[MIDDLEWARE] Current pathname:', pathname)
+
+    // If no profile exists or has no name, redirect to complete-profile
+    if (!userProfile || !userProfile.name) {
+      console.log('[MIDDLEWARE] No profile found, redirecting to complete-profile')
+      const url = request.nextUrl.clone()
+      url.pathname = profileCompletionRoute
+      return NextResponse.redirect(url)
+    }
+    
+    console.log('[MIDDLEWARE] Profile exists, allowing access to:', pathname)
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
