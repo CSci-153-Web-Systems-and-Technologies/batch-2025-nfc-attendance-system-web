@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, Settings, User, Plus } from 'lucide-react'
 import { Button } from './button'
+import { LogoutButton } from '../logout-button'
 
 export function AuthenticatedNav() {
   const [isOpen, setIsOpen] = useState(false)
@@ -58,6 +59,9 @@ export function AuthenticatedNav() {
                   <span className="text-sm text-gray-700">User</span>
                 </button>
               </Link>
+              <div className="px-4 py-1">
+                <LogoutButton isExpanded={true} />
+              </div>
             </div>
           </div>
         )}
@@ -139,6 +143,9 @@ export function AuthenticatedNav() {
                 {isOpen && <span className="text-sm text-gray-700">User</span>}
               </Button>
             </Link>
+
+            {/* Logout */}
+            <LogoutButton isExpanded={isOpen} />
           </div>
         </nav>
       </aside>
