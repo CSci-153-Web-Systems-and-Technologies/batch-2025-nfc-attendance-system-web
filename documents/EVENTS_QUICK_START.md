@@ -16,39 +16,55 @@ This feature adds event management capabilities to the NFC Attendance System. Ev
 
 ### 1. Database Setup
 
-Run the SQL from `EVENTS_BACKEND_SETUP.md` in your Supabase SQL editor:
+**IMPORTANT**: Run the complete SQL setup script from `EVENTS_BACKEND_SETUP.md`
+
+#### Step-by-Step:
+
+1. **Open Supabase SQL Editor**
+   - Go to your Supabase project dashboard
+   - Click on "SQL Editor" in the left sidebar
+   - Create a new query
+
+2. **Copy Complete Setup Script**
+   - Open `documents/EVENTS_BACKEND_SETUP.md`
+   - Copy the **entire "Complete Setup Script"** section (starts at "EVENTS BACKEND SETUP - COMPLETE SCRIPT")
+   - This single script includes:
+     - ✅ Events table creation
+     - ✅ All indexes for performance
+     - ✅ Row-level security policies
+     - ✅ Automatic timestamp trigger
+     - ✅ Verification queries
+
+3. **Run the Script**
+   - Paste into Supabase SQL Editor
+   - Click "Run" or press Ctrl+Enter
+   - Wait for execution to complete
+
+4. **Verify Setup**
+   - Check the output of the verification queries at the end
+   - Should see:
+     - "Events table created successfully!"
+     - "RLS is ENABLED ✓"
+     - "Total policies: 4"
+     - "Total indexes: 6"
+
+#### Prerequisites Check
+
+Before running the script, verify these tables exist:
 
 ```sql
--- Create events table (see EVENTS_BACKEND_SETUP.md for full SQL)
-CREATE TABLE IF NOT EXISTS events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_name TEXT NOT NULL,
-  date TIMESTAMPTZ NOT NULL,
-  organization_id UUID NOT NULL,
-  description TEXT,
-  location TEXT,
-  created_by UUID NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  CONSTRAINT fk_organization
-    FOREIGN KEY (organization_id)
-    REFERENCES organizations(id)
-    ON DELETE CASCADE,
-  
-  CONSTRAINT fk_created_by_user
-    FOREIGN KEY (created_by)
-    REFERENCES users(id)
-    ON DELETE CASCADE
-);
-
--- Don't forget to:
--- 1. Create indexes
--- 2. Enable RLS
--- 3. Set up policies
--- 4. Add triggers
--- (All included in EVENTS_BACKEND_SETUP.md)
+-- Run this in Supabase SQL Editor first
+SELECT 
+  table_name,
+  'EXISTS ✓' as status
+FROM information_schema.tables
+WHERE table_name IN ('users', 'organizations', 'organization_members')
+  AND table_schema = 'public';
 ```
+
+You should see all 3 tables. If any are missing:
+- For `users`: See [USER_BACKEND_SETUP.md](./USER_BACKEND_SETUP.md)
+- For `organizations` and `organization_members`: See [ORGANIZATION_BACKEND_SETUP.md](./ORGANIZATION_BACKEND_SETUP.md)
 
 ### 2. Verify Setup
 
