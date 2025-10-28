@@ -16,9 +16,17 @@ This feature adds event management capabilities to the NFC Attendance System. Ev
 
 ### 1. Database Setup
 
-**IMPORTANT**: Run the complete SQL setup script from `EVENTS_BACKEND_SETUP.md`
+**IMPORTANT**: Run the complete SQL setup script
 
-#### Step-by-Step:
+#### Option A: Use Standalone SQL File (Recommended)
+
+1. **Open** `documents/setup-events.sql`
+2. **Copy** the entire file contents
+3. **Paste** into Supabase SQL Editor
+4. **Run** the script
+5. **Verify** the results at the end
+
+#### Option B: Use Documentation
 
 1. **Open Supabase SQL Editor**
    - Go to your Supabase project dashboard
@@ -27,7 +35,7 @@ This feature adds event management capabilities to the NFC Attendance System. Ev
 
 2. **Copy Complete Setup Script**
    - Open `documents/EVENTS_BACKEND_SETUP.md`
-   - Copy the **entire "Complete Setup Script"** section (starts at "EVENTS BACKEND SETUP - COMPLETE SCRIPT")
+   - Copy the **entire "Complete Setup Script"** section
    - This single script includes:
      - ✅ Events table creation
      - ✅ All indexes for performance
@@ -65,6 +73,15 @@ WHERE table_name IN ('users', 'organizations', 'organization_members')
 You should see all 3 tables. If any are missing:
 - For `users`: See [USER_BACKEND_SETUP.md](./USER_BACKEND_SETUP.md)
 - For `organizations` and `organization_members`: See [ORGANIZATION_BACKEND_SETUP.md](./ORGANIZATION_BACKEND_SETUP.md)
+
+#### Optional: Add Test Data
+
+To populate sample events for testing:
+
+1. **Open** `documents/test-data-events.sql`
+2. **Replace** placeholder UUIDs with actual organization and user IDs
+3. **Run** the script in Supabase SQL Editor
+4. **Verify** test events were created
 
 ### 2. Verify Setup
 
