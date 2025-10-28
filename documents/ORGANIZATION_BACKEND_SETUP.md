@@ -145,17 +145,32 @@ CREATE POLICY "Members can view members in their organizations"
     )
   );
 
--- Policy: System can insert members (handled by service layer with proper auth)
+-- Policy: Allow adding members if user is Owner/Admin OR if adding self as owner during org creation
 CREATE POLICY "Owners and Admins can add members"
   ON organization_members
   FOR INSERT
   WITH CHECK (
+    -- Allow if current user is Owner or Admin in this org
     organization_id IN (
-      SELECT om.organization_id FROM organization_members om
+      SELECT om.organization_id 
+      FROM organization_members om
       WHERE om.user_id IN (
         SELECT id FROM users WHERE auth_id = auth.uid()
       )
       AND om.role IN ('Owner', 'Admin')
+    )
+    OR
+    -- Allow if adding self as Owner during organization creation
+    (
+      role = 'Owner' 
+      AND user_id IN (
+        SELECT id FROM users WHERE auth_id = auth.uid()
+      )
+      AND organization_id IN (
+        SELECT id FROM organizations WHERE owner_user_id IN (
+          SELECT id FROM users WHERE auth_id = auth.uid()
+        )
+      )
     )
   );
 
@@ -361,12 +376,27 @@ CREATE POLICY "Owners and Admins can add members"
   ON organization_members
   FOR INSERT
   WITH CHECK (
+    -- Allow if current user is Owner or Admin in this org
     organization_id IN (
-      SELECT om.organization_id FROM organization_members om
+      SELECT om.organization_id 
+      FROM organization_members om
       WHERE om.user_id IN (
         SELECT id FROM users WHERE auth_id = auth.uid()
       )
       AND om.role IN ('Owner', 'Admin')
+    )
+    OR
+    -- Allow if adding self as Owner during organization creation
+    (
+      role = 'Owner' 
+      AND user_id IN (
+        SELECT id FROM users WHERE auth_id = auth.uid()
+      )
+      AND organization_id IN (
+        SELECT id FROM organizations WHERE owner_user_id IN (
+          SELECT id FROM users WHERE auth_id = auth.uid()
+        )
+      )
     )
   );
 
