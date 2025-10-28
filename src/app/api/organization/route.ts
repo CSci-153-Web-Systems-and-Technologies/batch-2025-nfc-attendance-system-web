@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Get all organizations user is a member of
     const organizations = await OrganizationService.getUserOrganizations(
+      supabase,
       userProfile.id
     )
 
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Create organization
     const organization = await OrganizationService.createOrganization(
+      supabase,
       userProfile.id,
       {
         name: name.trim(),

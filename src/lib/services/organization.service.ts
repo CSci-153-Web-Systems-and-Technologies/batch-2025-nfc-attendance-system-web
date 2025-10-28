@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Organization,
   OrganizationMember,
@@ -17,10 +18,10 @@ export class OrganizationService {
    * Automatically adds the creator as Owner
    */
   static async createOrganization(
+    supabase: SupabaseClient,
     userId: string,
     input: CreateOrganizationInput
   ): Promise<Organization | null> {
-    const supabase = await createClient()
 
     // Start a transaction by creating organization first
     const { data: org, error: orgError } = await supabase
@@ -128,9 +129,9 @@ export class OrganizationService {
    * Get all organizations where user is a member
    */
   static async getUserOrganizations(
+    supabase: SupabaseClient,
     userId: string
   ): Promise<OrganizationWithRole[]> {
-    const supabase = await createClient()
 
     const { data: memberships, error: memberError } = await supabase
       .from('organization_members')
