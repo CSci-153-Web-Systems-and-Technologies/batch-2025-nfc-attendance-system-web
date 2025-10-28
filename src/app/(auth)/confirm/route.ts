@@ -17,6 +17,22 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Check if user has completed their profile
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('id, name')
+          .eq('auth_id', user.id)
+          .maybeSingle()
+
+        // If no profile or no name, redirect to complete profile
+        if (!userProfile || !userProfile.name) {
+          redirect('/complete-profile')
+        }
+      }
+      
       redirect(next)
     } else {
       redirect(`/error?error=${error?.message}`)
@@ -30,6 +46,22 @@ export async function GET(request: NextRequest) {
       token_hash,
     })
     if (!error) {
+      // Check if user has completed their profile
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('id, name')
+          .eq('auth_id', user.id)
+          .maybeSingle()
+
+        // If no profile or no name, redirect to complete profile
+        if (!userProfile || !userProfile.name) {
+          redirect('/complete-profile')
+        }
+      }
+      
       // redirect user to specified redirect URL or root of app
       redirect(next)
     } else {
