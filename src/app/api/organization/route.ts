@@ -20,16 +20,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Get all organizations user is a member of
+    // Get all organizations user is a member of (use auth user ID directly)
     const organizations = await OrganizationService.getUserOrganizations(
-      userProfile.id
+      supabase,
+      user.id
     )
 
     return NextResponse.json({
@@ -62,8 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
@@ -81,9 +82,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create organization
+    // Create organization (use auth user ID directly)
     const organization = await OrganizationService.createOrganization(
-      userProfile.id,
+      supabase,
+      user.id,
       {
         name: name.trim(),
         description: description?.trim() || undefined,

@@ -25,16 +25,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check if user is a member
+    // Check if user is a member (use auth user ID directly)
     const authResult = await requireOrgPermission(
-      userProfile.id,
+      user.id,
       organizationId,
       'canViewAttendance'
     )
@@ -88,16 +88,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check permission
+    // Check permission (use auth user ID directly)
     const authResult = await requireOrgPermission(
-      userProfile.id,
+      user.id,
       organizationId,
       'canManageMembers'
     )
@@ -208,16 +208,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check permission
+    // Check permission (use auth user ID directly)
     const authResult = await requireOrgPermission(
-      userProfile.id,
+      user.id,
       organizationId,
       'canManageMembers'
     )
