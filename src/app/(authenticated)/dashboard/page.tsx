@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info, Plus, Building2, Users, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
@@ -76,6 +76,56 @@ export default function DashboardPage() {
               Create Event
             </Button>
           </Link>
+        </div>
+
+        {/* Quick Access Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Access</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Organizations Card */}
+            <Link href="/organizations">
+              <div className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-violet-100 hover:border-violet-300 cursor-pointer group">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-1">Organizations</h3>
+                    <p className="text-sm text-gray-600">View and manage your organizations</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Create Event Card */}
+            <Link href="/dashboard/create-event">
+              <div className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-violet-100 hover:border-violet-300 cursor-pointer group">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Calendar className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-1">Create Event</h3>
+                    <p className="text-sm text-gray-600">Set up a new event for your organization</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Members Card (Placeholder) */}
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 opacity-60 cursor-not-allowed">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gray-300 rounded-lg flex items-center justify-center shrink-0">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-800 mb-1">Members</h3>
+                  <p className="text-sm text-gray-600">Manage organization members</p>
+                  <span className="text-xs text-gray-500 mt-1 inline-block">Coming soon</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">

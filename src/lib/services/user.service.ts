@@ -1,29 +1,9 @@
 import { createClient } from '@/lib/server'
-import type { CreateUserInput, UpdateUserInput, User } from '@/types/user'
+import type { CreateUserInput, UpdateUserInput, User, AuthProvider } from '@/types/user'
 
 export class UserService {
   /**
-   * Get user profile by auth ID
-   */
-  static async getUserByAuthId(authId: string): Promise<User | null> {
-    const supabase = await createClient()
-    
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authId)
-      .single()
-
-    if (error) {
-      console.error('Error fetching user by auth ID:', error)
-      return null
-    }
-
-    return data
-  }
-
-  /**
-   * Get user profile by user ID
+   * Get user profile by ID (which is the auth user ID)
    */
   static async getUserById(userId: string): Promise<User | null> {
     const supabase = await createClient()
@@ -104,9 +84,11 @@ export class UserService {
 
   /**
    * Create a new user profile
+   * @param authUserId - The Supabase auth.users.id
+   * @param input - User profile data
    */
   static async createUser(
-    authId: string,
+    authUserId: string,
     input: CreateUserInput
   ): Promise<{ user: User | null; error: string | null }> {
     const supabase = await createClient()
@@ -114,10 +96,12 @@ export class UserService {
     const { data, error } = await supabase
       .from('users')
       .insert({
-        auth_id: authId,
+        id: authUserId, // Use auth user ID directly as primary key
         name: input.name,
         email: input.email,
         user_type: input.user_type,
+        auth_provider: input.auth_provider,
+        has_password: input.has_password,
         nfc_tag_id: input.nfc_tag_id || null,
         qr_code_data: input.qr_code_data || null,
       })
@@ -163,6 +147,25 @@ export class UserService {
   }
 
   /**
+   * Mark that user has set a password (for OAuth users who add password later)
+   */
+  static async markPasswordSet(userId: string): Promise<{ success: boolean; error: string | null }> {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('users')
+      .update({ has_password: true })
+      .eq('id', userId)
+
+    if (error) {
+      console.error('Error marking password as set:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, error: null }
+  }
+
+  /**
    * Delete user profile
    */
   static async deleteUser(userId: string): Promise<{ success: boolean; error: string | null }> {
@@ -182,10 +185,10 @@ export class UserService {
   }
 
   /**
-   * Check if user profile exists for auth user
+   * Check if user profile exists
    */
-  static async hasProfile(authId: string): Promise<boolean> {
-    const user = await this.getUserByAuthId(authId)
+  static async hasProfile(userId: string): Promise<boolean> {
+    const user = await this.getUserById(userId)
     return user !== null
   }
 
@@ -232,5 +235,66 @@ export class UserService {
     }
 
     return data === null
+  }
+
+  /**
+   * Check if user can reset password
+   * OAuth users without password set should be directed to set password instead
+   */
+  static async canResetPassword(email: string): Promise<{
+    canReset: boolean
+    reason?: string
+    authProvider?: AuthProvider
+    hasPassword?: boolean
+  }> {
+    const user = await this.getUserByEmail(email)
+    
+    if (!user) {
+      return { 
+        canReset: false, 
+        reason: 'No account found with this email address' 
+      }
+    }
+
+    if (user.has_password) {
+      return { 
+        canReset: true,
+        authProvider: user.auth_provider,
+        hasPassword: true
+      }
+    }
+
+    // OAuth user without password
+    return {
+      canReset: false,
+      reason: `This account was created using ${user.auth_provider}. You can set a password to enable password login.`,
+      authProvider: user.auth_provider,
+      hasPassword: false
+    }
+  }
+
+  /**
+   * Determine auth provider from Supabase auth user
+   */
+  static getAuthProviderFromUser(authUser: any): AuthProvider {
+    // Check app_metadata or user_metadata for provider info
+    const provider = authUser.app_metadata?.provider || authUser.user_metadata?.provider
+    
+    if (provider && ['email', 'google', 'github', 'azure', 'facebook'].includes(provider)) {
+      return provider as AuthProvider
+    }
+
+    // Fallback: if email confirmed and no provider, assume email
+    return authUser.email_confirmed_at ? 'email' : 'email'
+  }
+
+  /**
+   * Check if auth user has password set
+   */
+  static authUserHasPassword(authUser: any): boolean {
+    // If user signed up with email/password, they have a password
+    // OAuth users will not have password initially
+    const provider = this.getAuthProviderFromUser(authUser)
+    return provider === 'email'
   }
 }
