@@ -15,15 +15,15 @@ export default async function OrganizationsPage() {
     redirect('/login')
   }
 
-  // Get user profile to get user ID
-  const userProfile = await UserService.getUserByAuthId(user.id)
+  // Verify user profile exists
+  const userProfile = await UserService.getUserById(user.id)
 
   if (!userProfile) {
     redirect('/complete-profile')
   }
 
-  // Fetch user's organizations
-  const organizations = await OrganizationService.getUserOrganizations(supabase, userProfile.id)
+  // Fetch user's organizations (use auth user ID directly)
+  const organizations = await OrganizationService.getUserOrganizations(supabase, user.id)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">

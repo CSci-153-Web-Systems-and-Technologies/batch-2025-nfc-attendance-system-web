@@ -26,15 +26,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check if user is owner
-    const authResult = await requireOrgOwner(userProfile.id, organizationId)
+    // Check if user is owner (use auth user ID directly)
+    const authResult = await requireOrgOwner(user.id, organizationId)
 
     if (!isAuthorized(authResult)) {
       return authResult
@@ -65,7 +65,7 @@ export async function POST(
     }
 
     // Cannot transfer to self
-    if (new_owner_id === userProfile.id) {
+    if (new_owner_id === user.id) {
       return NextResponse.json(
         { error: 'You are already the owner' },
         { status: 400 }

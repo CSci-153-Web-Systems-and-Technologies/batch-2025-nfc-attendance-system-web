@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
