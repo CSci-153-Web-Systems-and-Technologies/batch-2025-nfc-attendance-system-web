@@ -21,8 +21,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
@@ -39,9 +39,9 @@ export async function GET(
 
     let event
     if (includeDetails) {
-      event = await EventService.getEventWithDetails(userProfile.id, id)
+      event = await EventService.getEventWithDetails(user.id, id)
     } else {
-      event = await EventService.getEventById(userProfile.id, id)
+      event = await EventService.getEventById(user.id, id)
     }
 
     if (!event) {
@@ -75,8 +75,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
@@ -106,7 +106,7 @@ export async function PUT(
       }
     }
 
-    const event = await EventService.updateEvent(userProfile.id, id, input)
+    const event = await EventService.updateEvent(user.id, id, input)
 
     if (!event) {
       return NextResponse.json(
@@ -142,8 +142,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
@@ -154,7 +154,7 @@ export async function DELETE(
 
     const { id } = await params
 
-    const success = await EventService.deleteEvent(userProfile.id, id)
+    const success = await EventService.deleteEvent(user.id, id)
 
     if (!success) {
       return NextResponse.json(

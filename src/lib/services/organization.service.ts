@@ -138,8 +138,12 @@ export class OrganizationService {
       .select('organization_id, role')
       .eq('user_id', userId)
 
-    if (memberError || !memberships) {
+    if (memberError) {
       console.error('Error fetching user memberships:', memberError)
+      return []
+    }
+
+    if (!memberships) {
       return []
     }
 
@@ -284,11 +288,13 @@ export class OrganizationService {
 
   /**
    * Get all members of an organization with user details
+   * Uses service role to bypass RLS
    */
   static async getOrganizationMembers(
     organizationId: string
   ): Promise<OrganizationMemberWithUser[]> {
-    const supabase = await createClient()
+    const { createServiceRoleClient } = await import('@/lib/server')
+    const supabase = createServiceRoleClient()
 
     const { data, error } = await supabase
       .from('organization_members')
