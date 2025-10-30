@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, tag } = body
 
     // Validate input
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -82,20 +82,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate tag format if provided
+    if (tag && (typeof tag !== 'string' || !/^[A-Z0-9]{2,10}$/.test(tag.trim()))) {
+      return NextResponse.json(
+        { error: 'Tag must be 2-10 uppercase letters/numbers' },
+        { status: 400 }
+      )
+    }
+
     // Create organization (use auth user ID directly)
-    const organization = await OrganizationService.createOrganization(
+    const result = await OrganizationService.createOrganization(
       supabase,
       user.id,
       {
         name: name.trim(),
         description: description?.trim() || undefined,
+        tag: tag?.trim() || undefined,
       }
     )
 
-    if (!organization) {
+    if (result.error || !result.data) {
       return NextResponse.json(
-        { error: 'Failed to create organization' },
-        { status: 500 }
+        { error: result.error || 'Failed to create organization' },
+        { status: 400 }
       )
     }
 
@@ -103,7 +112,7 @@ export async function POST(request: NextRequest) {
       {
         message: 'Organization created successfully',
         organization: {
-          ...organization,
+          ...result.data,
           user_role: 'Owner',
         },
       },
