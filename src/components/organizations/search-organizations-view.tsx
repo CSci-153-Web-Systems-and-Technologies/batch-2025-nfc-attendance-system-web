@@ -297,15 +297,15 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
 
           {searchResults.map((org) => (
             <Card key={org.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="w-12 h-12 bg-gradient-to-br from-violet-200 to-purple-200 rounded-lg flex items-center justify-center shrink-0">
-                      <Building2 className="h-6 w-6 text-violet-600" />
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div className="w-14 h-14 bg-gradient-to-br from-violet-200 to-purple-200 rounded-lg flex items-center justify-center shrink-0">
+                      <Building2 className="h-7 w-7 text-violet-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-800 text-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-gray-900 text-lg">
                           {org.name}
                         </h3>
                         {org.is_member && (
@@ -319,8 +319,8 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
                           {org.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <div className="flex items-center gap-1.5">
                           <Users className="h-4 w-4" />
                           <span>{org.member_count || 0} members</span>
                         </div>
@@ -329,7 +329,7 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
                       </div>
                     </div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex items-start pt-1">
                     {org.is_member ? (
                       <Button
                         onClick={() => router.push(`/organizations/${org.id}`)}
