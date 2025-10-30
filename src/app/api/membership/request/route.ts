@@ -5,8 +5,7 @@ import { UserService } from '@/lib/services/user.service'
 /**
  * POST /api/membership/request
  * Request to join an organization
- * Note: For now, this creates a pending membership that needs approval
- * In the future, this could create a separate join_request record
+ * Creates a pending join request that requires admin/owner approval
  */
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Check if organization exists
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .select('id, name')
+      .select('id, name, tag')
       .eq('id', organization_id)
       .single()
 
@@ -71,34 +70,48 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For this simplified version, we'll add the user directly as a Member
-    // In a real application, you'd want to:
-    // 1. Create a join request record
-    // 2. Notify organization admins
-    // 3. Wait for approval before adding to organization_members
-    
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
+    // Check if user already has a pending request
+    const { data: existingRequest } = await supabase
+      .from('organization_join_requests')
+      .select('id, status')
+      .eq('organization_id', organization_id)
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .single()
+
+    if (existingRequest) {
+      return NextResponse.json(
+        { 
+          error: 'You already have a pending request for this organization',
+          request: existingRequest 
+        },
+        { status: 400 }
+      )
+    }
+
+    // Create join request
+    const { data: joinRequest, error: requestError } = await supabase
+      .from('organization_join_requests')
       .insert({
         organization_id,
         user_id: user.id,
-        role: 'Member', // Default role for new members
+        status: 'pending',
       })
       .select()
       .single()
 
-    if (memberError) {
-      console.error('Error creating membership:', memberError)
+    if (requestError) {
+      console.error('Error creating join request:', requestError)
       return NextResponse.json(
-        { error: 'Failed to join organization' },
+        { error: 'Failed to create join request' },
         { status: 500 }
       )
     }
 
     return NextResponse.json(
       {
-        message: 'Successfully joined organization',
-        membership,
+        message: 'Join request submitted successfully. Waiting for admin approval.',
+        request: joinRequest,
         organization: org,
       },
       { status: 201 }
