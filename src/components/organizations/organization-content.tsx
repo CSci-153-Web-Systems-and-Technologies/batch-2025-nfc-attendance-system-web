@@ -3,6 +3,7 @@
 import { OrganizationWithRole } from '@/types/organization'
 import { Building2, Users, Calendar, Shield } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { JoinRequestsCard } from './join-requests-card'
 
 interface OrganizationContentProps {
   organization: OrganizationWithRole
@@ -130,6 +131,11 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
           </div>
         </CardContent>
       </Card>
+
+      {/* Join Requests Card - Only visible to Owners and Admins */}
+      {(organization.user_role === 'Owner' || organization.user_role === 'Admin') && (
+        <JoinRequestsCard organizationId={organization.id} />
+      )}
 
       {/* Recent Activity Card - Placeholder */}
       <Card className="bg-white shadow-md">
