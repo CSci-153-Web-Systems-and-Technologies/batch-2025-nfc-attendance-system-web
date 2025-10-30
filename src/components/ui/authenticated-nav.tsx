@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, Settings, User, Plus } from 'lucide-react'
+import { Menu, Settings, User, LayoutDashboard, Users } from 'lucide-react'
 import { Button } from './button'
+import { LogoutButton } from '../logout-button'
 
 export function AuthenticatedNav() {
   const [isOpen, setIsOpen] = useState(false)
@@ -36,12 +37,16 @@ export function AuthenticatedNav() {
         {isMobileMenuOpen && (
           <div className="absolute top-full left-4 mt-2 w-48 bg-white rounded-lg shadow-lg border border-violet-100 overflow-hidden">
             <div className="py-2">
-              <Link href="/dashboard/create-event" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
                 <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center">
-                    <Plus className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="text-sm text-gray-700">Create Event</span>
+                  <LayoutDashboard className="h-5 w-5 text-violet-600" />
+                  <span className="text-sm text-gray-700">Dashboard</span>
+                </button>
+              </Link>
+              <Link href="/organizations" onClick={() => setIsMobileMenuOpen(false)}>
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
+                  <Users className="h-5 w-5 text-violet-600" />
+                  <span className="text-sm text-gray-700">My Organizations</span>
                 </button>
               </Link>
               <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)}>
@@ -58,6 +63,9 @@ export function AuthenticatedNav() {
                   <span className="text-sm text-gray-700">User</span>
                 </button>
               </Link>
+              <div className="px-4 py-1">
+                <LogoutButton isExpanded={true} />
+              </div>
             </div>
           </div>
         )}
@@ -91,20 +99,34 @@ export function AuthenticatedNav() {
 
         {/* Navigation Items */}
         <nav className="flex flex-col justify-between h-[calc(100%-5rem)]">
-          {/* Top Section - Create Event */}
+          {/* Top Section - Main Navigation */}
           <div className="flex flex-col gap-2 px-2">
-            <Link href="/dashboard/create-event">
+            {/* Dashboard */}
+            <Link href="/dashboard">
               <Button
                 variant="ghost"
                 className={`w-full justify-start gap-3 hover:bg-violet-100 ${
                   !isOpen ? 'px-2' : 'px-3'
                 }`}
               >
-                <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center shrink-0">
-                  <Plus className="h-4 w-4 text-white" />
-                </div>
+                <LayoutDashboard className="h-5 w-5 text-violet-600 shrink-0" />
                 {isOpen && (
-                  <span className="text-sm text-gray-700">Create Event</span>
+                  <span className="text-sm text-gray-700">Dashboard</span>
+                )}
+              </Button>
+            </Link>
+
+            {/* My Organizations */}
+            <Link href="/organizations">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                  !isOpen ? 'px-2' : 'px-3'
+                }`}
+              >
+                <Users className="h-5 w-5 text-violet-600 shrink-0" />
+                {isOpen && (
+                  <span className="text-sm text-gray-700">My Organizations</span>
                 )}
               </Button>
             </Link>
@@ -139,6 +161,9 @@ export function AuthenticatedNav() {
                 {isOpen && <span className="text-sm text-gray-700">User</span>}
               </Button>
             </Link>
+
+            {/* Logout */}
+            <LogoutButton isExpanded={isOpen} />
           </div>
         </nav>
       </aside>

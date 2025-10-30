@@ -1,6 +1,7 @@
-import Image from "next/image";
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/server'
+import Link from 'next/link'
+import { Calendar } from 'lucide-react'
 
 export default async function Home() {
   // Check if user is authenticated and redirect to dashboard
@@ -12,101 +13,86 @@ export default async function Home() {
   }
 
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 bg-violet-50/30">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-purple-50">
+      {/* Hero Section */}
+      <div className="container mx-auto px-4 py-16 md:py-24">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Calendar className="h-8 w-8 text-white" />
+            </div>
+          </div>
+          
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            NFC Attendance System
+          </h1>
+          
+          <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Streamline your event attendance tracking with NFC technology. 
+            Manage events, track attendance, and analyze participation all in one place.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link 
+              href="/sign-up"
+              className="w-full sm:w-auto px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl"
+            >
+              Get Started
+            </Link>
+            <Link 
+              href="/login"
+              className="w-full sm:w-auto px-8 py-3 bg-white hover:bg-gray-50 text-violet-600 font-medium rounded-lg border-2 border-violet-600 transition-colors"
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </div>
+
+      {/* Features Section */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="w-12 h-12 bg-violet-100 rounded-lg flex items-center justify-center mb-4">
+              <Calendar className="h-6 w-6 text-violet-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Event Management</h3>
+            <p className="text-gray-600">
+              Create and manage events with ease. Track attendance in real-time.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+              <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">NFC Technology</h3>
+            <p className="text-gray-600">
+              Quick and secure check-ins using NFC-enabled devices.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+              <svg className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Analytics</h3>
+            <p className="text-gray-600">
+              Get insights into attendance patterns and event participation.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-4 py-8 mt-16 border-t border-gray-200">
+        <div className="text-center text-gray-600 text-sm">
+          <p>© 2025 NFC Attendance System. All rights reserved.</p>
+        </div>
       </footer>
     </div>
   );

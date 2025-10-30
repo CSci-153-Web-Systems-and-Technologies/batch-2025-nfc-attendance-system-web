@@ -77,11 +77,11 @@ export async function updateSession(request: NextRequest) {
   // Check if authenticated user has completed their profile
   // Skip check if already on complete-profile page or on public routes
   if (user && !isPublicRoute && !isProfileCompletionRoute) {
-    // Check if user has a profile in the database
+    // Check if user has a profile in the database using the auth user ID directly
     const { data: userProfile } = await supabase
       .from('users')
       .select('id, name')
-      .eq('auth_id', user.id)
+      .eq('id', user.id)
       .maybeSingle()
 
     console.log('[MIDDLEWARE] Checking profile for user:', user.id)
