@@ -48,6 +48,7 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
   })
   const [showFilters, setShowFilters] = useState(false)
   const [requestingJoin, setRequestingJoin] = useState<string | null>(null)
+  const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
 
   // Auto-search when filters change (but not on initial mount)
   const [hasSearched, setHasSearched] = useState(false)
@@ -87,6 +88,15 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
       const data = await response.json()
       setSearchResults(data.results || [])
       setPagination(data.pagination || pagination)
+      
+      // Track pending requests from search results
+      const pending = new Set<string>()
+      data.results?.forEach((org: any) => {
+        if (org.has_pending_request) {
+          pending.add(org.id)
+        }
+      })
+      setPendingRequests(pending)
     } catch (error) {
       console.error('Error searching organizations:', error)
       setSearchResults([])
@@ -123,11 +133,14 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
         throw new Error(error.error || 'Failed to request to join')
       }
 
+      // Add to pending requests set
+      setPendingRequests(prev => new Set(prev).add(organizationId))
+      
       // Refresh search results to update the pending request status
       await handleSearch(pagination.page)
       
       // You could add a toast notification here
-      alert('Join request sent successfully!')
+      alert('Join request sent successfully! Wait for admin approval.')
     } catch (error) {
       console.error('Error requesting to join:', error)
       alert(error instanceof Error ? error.message : 'Failed to send join request')
@@ -338,13 +351,21 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
                       >
                         View
                       </Button>
+                    ) : pendingRequests.has(org.id) || org.has_pending_request ? (
+                      <Button
+                        disabled
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 bg-orange-50"
+                      >
+                        Request Pending
+                      </Button>
                     ) : (
                       <Button
                         onClick={() => handleRequestToJoin(org.id)}
                         disabled={requestingJoin === org.id}
                         className="bg-violet-600 hover:bg-violet-700 text-white"
                       >
-                        {requestingJoin === org.id ? 'Joining...' : 'Join'}
+                        {requestingJoin === org.id ? 'Requesting...' : 'Request to Join'}
                       </Button>
                     )}
                   </div>
