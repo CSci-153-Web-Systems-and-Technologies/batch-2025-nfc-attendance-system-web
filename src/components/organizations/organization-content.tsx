@@ -27,9 +27,16 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
               <Building2 className="h-8 w-8 text-white" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-2xl font-bold text-gray-800 mb-2">
-                {organization.name}
-              </CardTitle>
+              <div className="flex items-center gap-3 mb-2">
+                <CardTitle className="text-2xl font-bold text-gray-800">
+                  {organization.name}
+                </CardTitle>
+                {organization.tag && (
+                  <span className="px-3 py-1 bg-violet-100 text-violet-700 text-sm font-semibold rounded-full">
+                    {organization.tag}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Shield className="h-4 w-4 text-violet-600" />
                 <span className="font-medium">{organization.user_role}</span>

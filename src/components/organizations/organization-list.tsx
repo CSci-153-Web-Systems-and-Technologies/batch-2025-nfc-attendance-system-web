@@ -50,13 +50,20 @@ export function OrganizationList({
                 }`} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className={`font-semibold text-sm truncate ${
-                  selectedOrg?.id === org.id
-                    ? 'text-violet-900'
-                    : 'text-gray-800'
-                }`}>
-                  {org.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-semibold text-sm truncate ${
+                    selectedOrg?.id === org.id
+                      ? 'text-violet-900'
+                      : 'text-gray-800'
+                  }`}>
+                    {org.name}
+                  </h3>
+                  {org.tag && (
+                    <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-medium rounded">
+                      {org.tag}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Role: <span className="font-medium">{org.user_role}</span>
                 </p>
