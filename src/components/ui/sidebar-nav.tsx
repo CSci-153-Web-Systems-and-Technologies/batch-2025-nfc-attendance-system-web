@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, Settings, User, LogIn, X } from 'lucide-react'
+import { Menu, Settings, User, LogIn, X, Building2 } from 'lucide-react'
 import { Button } from './button'
 
 export function SidebarNav() {
@@ -54,6 +54,12 @@ export function SidebarNav() {
                   <span className="text-sm text-gray-700">User</span>
                 </button>
               </Link>
+              <Link href="/organizations" onClick={() => setIsMobileMenuOpen(false)}>
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
+                  <Building2 className="h-5 w-5 text-violet-600" />
+                  <span className="text-sm text-gray-700">Organizations</span>
+                </button>
+              </Link>
               <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)}>
                 <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
                   <Settings className="h-5 w-5 text-violet-600" />
@@ -94,7 +100,18 @@ export function SidebarNav() {
         {/* Navigation Items */}
         <nav className="flex flex-col justify-between h-[calc(100%-5rem)]">
           <div className="flex flex-col gap-2 px-2">
-            {/* Add additional nav items here if needed */}
+            {/* Organizations */}
+            <Link href="/organizations">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                  !isOpen ? 'px-2' : 'px-3'
+                }`}
+              >
+                <Building2 className="h-5 w-5 text-violet-600 shrink-0" />
+                {isOpen && <span className="text-sm text-gray-700">Organizations</span>}
+              </Button>
+            </Link>
           </div>
 
           {/* Bottom Navigation */}

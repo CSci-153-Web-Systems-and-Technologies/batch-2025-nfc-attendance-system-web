@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/server'
+import { UserService } from '@/lib/services/user.service'
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { type NextRequest } from 'next/server'
@@ -18,14 +19,11 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       // Check if user has completed their profile
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('id, name')
-          .eq('auth_id', user.id)
-          .maybeSingle()
+      if (authUser) {
+        // Check if profile exists using the auth user ID directly
+        const userProfile = await UserService.getUserById(authUser.id)
 
         // If no profile or no name, redirect to complete profile
         if (!userProfile || !userProfile.name) {
@@ -47,14 +45,11 @@ export async function GET(request: NextRequest) {
     })
     if (!error) {
       // Check if user has completed their profile
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('id, name')
-          .eq('auth_id', user.id)
-          .maybeSingle()
+      if (authUser) {
+        // Check if profile exists using the auth user ID directly
+        const userProfile = await UserService.getUserById(authUser.id)
 
         // If no profile or no name, redirect to complete profile
         if (!userProfile || !userProfile.name) {
