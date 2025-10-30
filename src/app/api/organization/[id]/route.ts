@@ -109,7 +109,7 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, tag } = body
 
     // Validate input
     const updateData: any = {}
@@ -126,6 +126,16 @@ export async function PUT(
 
     if (description !== undefined) {
       updateData.description = description?.trim() || null
+    }
+
+    if (tag !== undefined) {
+      if (tag && (typeof tag !== 'string' || !/^[A-Z0-9]{2,10}$/.test(tag.trim()))) {
+        return NextResponse.json(
+          { error: 'Tag must be 2-10 uppercase letters/numbers' },
+          { status: 400 }
+        )
+      }
+      updateData.tag = tag?.trim() || null
     }
 
     // Update organization
