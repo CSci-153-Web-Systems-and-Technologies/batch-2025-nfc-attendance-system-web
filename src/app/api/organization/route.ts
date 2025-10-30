@@ -20,16 +20,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Get all organizations user is a member of
+    // Get all organizations user is a member of (use auth user ID directly)
     const organizations = await OrganizationService.getUserOrganizations(
-      userProfile.id
+      supabase,
+      user.id
     )
 
     return NextResponse.json({
@@ -62,8 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, tag } = body
 
     // Validate input
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -81,19 +82,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create organization
-    const organization = await OrganizationService.createOrganization(
-      userProfile.id,
+    // Validate tag format if provided
+    if (tag && (typeof tag !== 'string' || !/^[A-Z0-9]{2,10}$/.test(tag.trim()))) {
+      return NextResponse.json(
+        { error: 'Tag must be 2-10 uppercase letters/numbers' },
+        { status: 400 }
+      )
+    }
+
+    // Create organization (use auth user ID directly)
+    const result = await OrganizationService.createOrganization(
+      supabase,
+      user.id,
       {
         name: name.trim(),
         description: description?.trim() || undefined,
+        tag: tag?.trim() || undefined,
       }
     )
 
-    if (!organization) {
+    if (result.error || !result.data) {
       return NextResponse.json(
-        { error: 'Failed to create organization' },
-        { status: 500 }
+        { error: result.error || 'Failed to create organization' },
+        { status: 400 }
       )
     }
 
@@ -101,7 +112,7 @@ export async function POST(request: NextRequest) {
       {
         message: 'Organization created successfully',
         organization: {
-          ...organization,
+          ...result.data,
           user_role: 'Owner',
         },
       },

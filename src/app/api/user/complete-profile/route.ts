@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if profile already exists
-    const existingUser = await UserService.getUserByAuthId(authUser.id)
+    const existingUser = await UserService.getUserById(authUser.id)
     if (existingUser) {
       return NextResponse.json(
         { error: 'Profile already exists' },
@@ -60,11 +60,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create user profile
+    // Determine auth provider and password status
+    const authProvider = UserService.getAuthProviderFromUser(authUser)
+    const hasPassword = UserService.authUserHasPassword(authUser)
+
+    // Create user profile with auth user ID as primary key
     const { user, error } = await UserService.createUser(authUser.id, {
       name: name.trim(),
       email: authUser.email!,
       user_type: user_type as UserType,
+      auth_provider: authProvider,
+      has_password: hasPassword,
       nfc_tag_id: nfc_tag_id || undefined,
       qr_code_data: qr_code_data || undefined,
     })

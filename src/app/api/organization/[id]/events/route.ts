@@ -21,8 +21,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile to get user ID
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json(
@@ -48,7 +48,7 @@ export async function GET(
     }
 
     const events = await EventService.getOrganizationEvents(
-      userProfile.id,
+      user.id,
       organizationId,
       filters
     )
