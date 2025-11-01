@@ -6,6 +6,7 @@ export interface Organization {
   id: string
   name: string
   description: string | null
+  tag: string | null
   owner_user_id: string
   created_at: string
   updated_at: string
@@ -37,11 +38,13 @@ export interface OrganizationMemberWithUser extends OrganizationMember {
 export interface CreateOrganizationInput {
   name: string
   description?: string
+  tag?: string
 }
 
 export interface UpdateOrganizationInput {
   name?: string
   description?: string
+  tag?: string
 }
 
 export interface AddMemberInput {

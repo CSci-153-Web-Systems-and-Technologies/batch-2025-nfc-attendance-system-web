@@ -1,14 +1,17 @@
 'use client'
 
 import { OrganizationWithRole } from '@/types/organization'
-import { Building2, Users, Calendar, Shield } from 'lucide-react'
+import { Building2, Users, Calendar, Shield, UserPlus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useRouter } from 'next/navigation'
 
 interface OrganizationContentProps {
   organization: OrganizationWithRole
 }
 
 export function OrganizationContent({ organization }: OrganizationContentProps) {
+  const router = useRouter()
+  
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -27,9 +30,16 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
               <Building2 className="h-8 w-8 text-white" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-2xl font-bold text-gray-800 mb-2">
-                {organization.name}
-              </CardTitle>
+              <div className="flex items-center gap-3 mb-2">
+                <CardTitle className="text-2xl font-bold text-gray-800">
+                  {organization.name}
+                </CardTitle>
+                {organization.tag && (
+                  <span className="px-3 py-1 bg-violet-100 text-violet-700 text-sm font-semibold rounded-full">
+                    {organization.tag}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Shield className="h-4 w-4 text-violet-600" />
                 <span className="font-medium">{organization.user_role}</span>
@@ -83,7 +93,10 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left">
+            <button 
+              onClick={() => router.push(`/organizations/${organization.id}/members`)}
+              className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                   <Users className="h-5 w-5 text-blue-600" />
@@ -108,17 +121,34 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
             </button>
 
             {(organization.user_role === 'Owner' || organization.user_role === 'Admin') && (
-              <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Shield className="h-5 w-5 text-purple-600" />
+              <>
+                <button 
+                  onClick={() => router.push(`/organizations/${organization.id}/requests`)}
+                  className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <UserPlus className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-800 text-sm">Join Requests</h4>
+                      <p className="text-xs text-gray-500">Review membership requests</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-gray-800 text-sm">Settings</h4>
-                    <p className="text-xs text-gray-500">Manage organization settings</p>
+                </button>
+
+                <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-800 text-sm">Settings</h4>
+                      <p className="text-xs text-gray-500">Manage organization settings</p>
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </>
             )}
           </div>
         </CardContent>
