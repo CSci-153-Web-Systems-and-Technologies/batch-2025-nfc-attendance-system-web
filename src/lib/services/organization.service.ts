@@ -21,7 +21,7 @@ export class OrganizationService {
     supabase: SupabaseClient,
     userId: string,
     input: CreateOrganizationInput
-  ): Promise<Organization | null> {
+  ): Promise<{ data: Organization | null; error: string | null }> {
 
     // Start a transaction by creating organization first
     const { data: org, error: orgError } = await supabase
@@ -29,6 +29,7 @@ export class OrganizationService {
       .insert({
         name: input.name,
         description: input.description || null,
+        tag: input.tag || null,
         owner_user_id: userId,
       })
       .select()
@@ -36,7 +37,13 @@ export class OrganizationService {
 
     if (orgError || !org) {
       console.error('Error creating organization:', orgError)
-      return null
+      
+      // Check for duplicate tag error
+      if (orgError?.code === '23505' && orgError?.message?.includes('unique_organization_tag')) {
+        return { data: null, error: 'An organization with this tag already exists' }
+      }
+      
+      return { data: null, error: orgError?.message || 'Failed to create organization' }
     }
 
     // Add creator as Owner member
@@ -51,10 +58,10 @@ export class OrganizationService {
     if (memberError) {
       console.error('Error adding owner as member:', memberError)
       // Note: In production, you'd want to rollback the org creation
-      return null
+      return { data: null, error: 'Failed to add owner as member' }
     }
 
-    return org
+    return { data: org, error: null }
   }
 
   /**
@@ -186,6 +193,7 @@ export class OrganizationService {
 
     if (input.name !== undefined) updateData.name = input.name
     if (input.description !== undefined) updateData.description = input.description
+    if (input.tag !== undefined) updateData.tag = input.tag
 
     const { data, error } = await supabase
       .from('organizations')
