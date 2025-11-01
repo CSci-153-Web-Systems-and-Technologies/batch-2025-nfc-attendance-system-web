@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!user_type || !['Student', 'Faculty', 'Admin'].includes(user_type)) {
+    if (!user_type || !['Student', 'Faculty'].includes(user_type)) {
       return NextResponse.json(
-        { error: 'Valid user type is required (Student, Faculty, or Admin)' },
+        { error: 'Valid user type is required (Student or Faculty)' },
         { status: 400 }
       )
     }
