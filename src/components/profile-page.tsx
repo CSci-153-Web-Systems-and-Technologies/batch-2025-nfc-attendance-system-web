@@ -147,8 +147,6 @@ export function ProfilePage() {
   // Get user type badge color
   const getUserTypeBadgeColor = (type: UserType) => {
     switch (type) {
-      case 'Admin':
-        return 'bg-purple-600'
       case 'Faculty':
         return 'bg-blue-600'
       case 'Student':
@@ -352,7 +350,6 @@ export function ProfilePage() {
                   >
                     <option value="Student">Student</option>
                     <option value="Faculty">Faculty</option>
-                    <option value="Admin">Admin</option>
                   </select>
                 </div>
 

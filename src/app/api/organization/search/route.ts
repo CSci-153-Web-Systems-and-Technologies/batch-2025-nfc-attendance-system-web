@@ -58,6 +58,15 @@ export async function GET(request: NextRequest) {
       userOrgIds = memberships?.map(m => m.organization_id) || []
     }
 
+    // Get user's pending join requests
+    const { data: pendingRequests } = await supabase
+      .from('organization_join_requests')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+
+    const pendingOrgIds = pendingRequests?.map(r => r.organization_id) || []
+
     // Build the base query
     let queryBuilder = supabase
       .from('organizations')
@@ -129,10 +138,11 @@ export async function GET(request: NextRequest) {
       results = results.filter(org => org.member_count <= maxMembers)
     }
 
-    // Add membership status to results
+    // Add membership status and pending request status to results
     const enrichedResults = results.map(org => ({
       ...org,
       is_member: userOrgIds.includes(org.id),
+      has_pending_request: pendingOrgIds.includes(org.id),
     }))
 
     // Calculate pagination metadata
