@@ -45,21 +45,24 @@ export default async function RequestsPage({ params }: RequestsPageProps) {
     .from('organization_join_requests')
     .select(`
       *,
-      user:users (
+      user:users!fk_user (
         id,
         name,
         email,
         user_type,
         nfc_tag_id
-      ),
-      reviewer:users!organization_join_requests_reviewed_by_fkey (
-        id,
-        name,
-        email
       )
     `)
     .eq('organization_id', organizationId)
     .order('requested_at', { ascending: false })
+
+  // Debug logging
+  console.log('Organization ID:', organizationId)
+  console.log('Requests found:', requests?.length || 0)
+  console.log('Error:', error)
+  if (requests && requests.length > 0) {
+    console.log('First request:', JSON.stringify(requests[0], null, 2))
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">

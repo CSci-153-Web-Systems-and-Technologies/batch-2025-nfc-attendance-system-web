@@ -42,17 +42,12 @@ export async function GET(
       .from('organization_join_requests')
       .select(`
         *,
-        user:users (
+        user:users!fk_user (
           id,
           name,
           email,
           user_type,
           nfc_tag_id
-        ),
-        reviewer:users!organization_join_requests_reviewed_by_fkey (
-          id,
-          name,
-          email
         )
       `)
       .eq('organization_id', organizationId)
