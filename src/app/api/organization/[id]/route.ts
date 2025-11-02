@@ -30,24 +30,24 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check if user is a member
-    const authResult = await requireOrgMembership(userProfile.id, organizationId)
+    // Check if user is a member (use auth user ID directly)
+    const authResult = await requireOrgMembership(user.id, organizationId)
 
     if (!isAuthorized(authResult)) {
       return authResult
     }
 
-    // Get organization with role
+    // Get organization with role (use auth user ID directly)
     const organization = await OrganizationService.getOrganizationWithRole(
       organizationId,
-      userProfile.id
+      user.id
     )
 
     if (!organization) {
@@ -89,16 +89,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check permission
+    // Check permission (use auth user ID directly)
     const authResult = await requireOrgPermission(
-      userProfile.id,
+      user.id,
       organizationId,
       'canManageOrganization'
     )
@@ -109,7 +109,7 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, tag } = body
 
     // Validate input
     const updateData: any = {}
@@ -126,6 +126,16 @@ export async function PUT(
 
     if (description !== undefined) {
       updateData.description = description?.trim() || null
+    }
+
+    if (tag !== undefined) {
+      if (tag && (typeof tag !== 'string' || !/^[A-Z0-9]{2,10}$/.test(tag.trim()))) {
+        return NextResponse.json(
+          { error: 'Tag must be 2-10 uppercase letters/numbers' },
+          { status: 400 }
+        )
+      }
+      updateData.tag = tag?.trim() || null
     }
 
     // Update organization
@@ -176,15 +186,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
-    const userProfile = await UserService.getUserByAuthId(user.id)
+    // Verify user profile exists
+    const userProfile = await UserService.getUserById(user.id)
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Check if user is owner
-    const authResult = await requireOrgOwner(userProfile.id, organizationId)
+    // Check if user is owner (use auth user ID directly)
+    const authResult = await requireOrgOwner(user.id, organizationId)
 
     if (!isAuthorized(authResult)) {
       return authResult
