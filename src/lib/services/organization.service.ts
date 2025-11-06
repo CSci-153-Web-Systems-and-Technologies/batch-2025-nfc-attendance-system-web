@@ -309,7 +309,7 @@ export class OrganizationService {
       .select(
         `
         *,
-        user:users!organization_members_user_id_fkey (
+        user:users!fk_user (
           id,
           name,
           email,
