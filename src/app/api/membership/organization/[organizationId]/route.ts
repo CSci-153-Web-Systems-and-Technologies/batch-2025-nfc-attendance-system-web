@@ -8,7 +8,7 @@ import { createClient } from '@/lib/server'
  */
 export async function GET(
   request: Request,
-  { params }: { params: { organizationId: string } }
+  { params }: { params: Promise<{ organizationId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const organizationId = params.organizationId
+  const { organizationId } = await params
 
     // Check if user is a member of the organization
     const userMembership = await MembershipService.getUserMembershipInOrganization(
