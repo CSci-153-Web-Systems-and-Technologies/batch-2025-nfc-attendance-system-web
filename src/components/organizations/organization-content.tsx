@@ -3,6 +3,7 @@
 import { OrganizationWithRole } from '@/types/organization'
 import { Building2, Users, Calendar, Shield, UserPlus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { JoinRequestsCard } from './join-requests-card'
 import { useRouter } from 'next/navigation'
 
 interface OrganizationContentProps {
@@ -108,7 +109,10 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
               </div>
             </button>
 
-            <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left">
+            <button 
+              onClick={() => router.push(`/organizations/${organization.id}/events`)}
+              className="p-4 border-2 border-gray-200 rounded-lg hover:border-violet-500 hover:bg-violet-50 transition-all duration-200 text-left"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                   <Calendar className="h-5 w-5 text-green-600" />
@@ -153,6 +157,11 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
           </div>
         </CardContent>
       </Card>
+
+      {/* Join Requests Card - Only visible to Owners and Admins */}
+      {(organization.user_role === 'Owner' || organization.user_role === 'Admin') && (
+        <JoinRequestsCard organizationId={organization.id} />
+      )}
 
       {/* Recent Activity Card - Placeholder */}
       <Card className="bg-white shadow-md">

@@ -48,7 +48,7 @@ export async function GET(
         reviewed_by,
         created_at,
         updated_at,
-        users!organization_join_requests_user_id_fkey (
+        users!fk_user (
           id,
           name,
           email,

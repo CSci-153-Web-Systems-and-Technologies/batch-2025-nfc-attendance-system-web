@@ -1,7 +1,7 @@
 # Organization Feature Documentation
 
-**Last Updated:** November 1, 2025  
-**Status:** ✅ Production Ready
+**Last Updated:** November 6, 2025  
+**Status:** ✅ Production Ready (Updated with function fixes)
 
 ---
 
@@ -215,12 +215,21 @@ CREATE TABLE organization_join_requests (
 ```sql
 -- Check if user is organization member
 is_org_member(org_id uuid, user_auth_id uuid) → boolean
+  -- Returns true if user is a member of the organization
+  -- Fixed: Nov 6, 2025 - Removed incorrect users table JOIN and u.auth_id reference
+  -- SECURITY DEFINER, STABLE
 
 -- Check if user is organization admin
 is_org_admin(org_id uuid, user_auth_id uuid) → boolean
+  -- Returns true if user has Owner or Admin role in the organization
+  -- Fixed: Nov 6, 2025 - Removed incorrect users table JOIN and u.auth_id reference
+  -- SECURITY DEFINER, STABLE
 
 -- Check if user is organization owner
 is_org_owner(org_id uuid, user_auth_id uuid) → boolean
+  -- Returns true if user is the owner of the organization
+  -- Fixed: Nov 6, 2025 - Removed incorrect users table JOIN and u.auth_id reference
+  -- SECURITY DEFINER, STABLE
 
 -- Get user's role in organization
 get_user_role_in_organization(p_user_id uuid, p_organization_id uuid) → text
@@ -237,6 +246,81 @@ get_organization_member_count(p_organization_id uuid) → integer
 -- Approve join request (creates membership)
 approve_join_request(p_request_id uuid, p_reviewer_id uuid) → boolean
 ```
+
+### Function Implementation Details
+
+#### `is_org_member()` - Fixed Nov 6, 2025
+Checks if a user is a member of an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_member(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organization_members om
+        WHERE om.organization_id = org_id
+        AND om.user_id = user_auth_id
+    );
+$$;
+```
+
+**Fix Applied:** Removed unnecessary JOIN with users table and non-existent `u.auth_id` column reference. The `user_id` in `organization_members` already contains `auth.uid()`.
+
+#### `is_org_admin()` - Fixed Nov 6, 2025
+Checks if a user has Owner or Admin role in an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_admin(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organization_members om
+        WHERE om.organization_id = org_id
+        AND om.user_id = user_auth_id
+        AND om.role IN ('Owner', 'Admin')
+    );
+$$;
+```
+
+**Fix Applied:** Removed unnecessary JOIN with users table and non-existent `u.auth_id` column reference.
+
+#### `is_org_owner()` - Fixed Nov 6, 2025
+Checks if a user is the owner of an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_owner(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organizations o
+        WHERE o.id = org_id
+        AND o.owner_user_id = user_auth_id
+    );
+$$;
+```
+
+**Fix Applied:** Removed unnecessary JOIN with users table and non-existent `u.auth_id` column reference.
 
 ---
 
