@@ -28,8 +28,20 @@ export function UpdatePasswordForm({ className, ...props }: React.ComponentProps
     setError(null)
 
     try {
+      // Update the password in Supabase Auth
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
+
+      // Mark that the user has set a password in our users table
+      // This is especially important for OAuth users setting their first password
+      const updateResponse = await fetch('/api/user/mark-password-set', {
+        method: 'POST',
+      })
+
+      if (!updateResponse.ok) {
+        console.warn('Failed to update has_password flag, but password was set successfully')
+      }
+
       // Redirect to dashboard after password update
       router.push('/dashboard')
       router.refresh()

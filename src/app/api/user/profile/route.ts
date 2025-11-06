@@ -20,8 +20,8 @@ export async function GET() {
       )
     }
 
-    // Get user profile
-    const user = await UserService.getUserByAuthId(authUser.id)
+    // Get user profile using auth user ID directly
+    const user = await UserService.getUserById(authUser.id)
 
     if (!user) {
       return NextResponse.json(
@@ -58,8 +58,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Get user profile to get user ID
-    const existingUser = await UserService.getUserByAuthId(authUser.id)
+    // Get user profile using auth user ID directly
+    const existingUser = await UserService.getUserById(authUser.id)
     
     if (!existingUser) {
       return NextResponse.json(
@@ -80,16 +80,16 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    if (user_type && !['Student', 'Faculty', 'Admin'].includes(user_type)) {
+    if (user_type && !['Student', 'Faculty'].includes(user_type)) {
       return NextResponse.json(
         { error: 'Invalid user type' },
         { status: 400 }
       )
     }
 
-    // Check if NFC tag is available
+    // Check if NFC tag is available (use auth user ID)
     if (nfc_tag_id) {
-      const isAvailable = await UserService.isNfcTagAvailable(nfc_tag_id, existingUser.id)
+      const isAvailable = await UserService.isNfcTagAvailable(nfc_tag_id, authUser.id)
       if (!isAvailable) {
         return NextResponse.json(
           { error: 'NFC tag already in use' },
@@ -98,8 +98,8 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update user
-    const { user, error } = await UserService.updateUser(existingUser.id, {
+    // Update user using auth user ID directly
+    const { user, error } = await UserService.updateUser(authUser.id, {
       name,
       user_type,
       nfc_tag_id,

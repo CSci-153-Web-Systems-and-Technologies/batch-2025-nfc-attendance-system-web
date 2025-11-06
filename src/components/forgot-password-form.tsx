@@ -20,18 +20,48 @@ export function ForgotPasswordForm({ className, ...props }: React.ComponentProps
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [oauthInfo, setOauthInfo] = useState<{
+    provider: string
+    hasPassword: boolean
+  } | null>(null)
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
+    setOauthInfo(null)
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
+      // First, check if user exists and their auth provider
+      const checkResponse = await fetch('/api/user/check-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      const checkData = await checkResponse.json()
+
+      if (!checkResponse.ok) {
+        throw new Error(checkData.error || 'Failed to check account')
+      }
+
+      // If user can't reset password (OAuth without password)
+      if (!checkData.canReset) {
+        setOauthInfo({
+          provider: checkData.authProvider || 'OAuth',
+          hasPassword: checkData.hasPassword || false,
+        })
+        setSuccess(false)
+        setIsLoading(false)
+        return
+      }
+
+      // User can reset password - send reset email
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/update-password`,
       })
+      
       if (error) throw error
       setSuccess(true)
     } catch (error: unknown) {
@@ -50,10 +80,80 @@ export function ForgotPasswordForm({ className, ...props }: React.ComponentProps
             <CardDescription>Password reset instructions sent</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              If you registered using your email and password, you will receive a password reset
-              email.
+            <p className="text-sm text-muted-foreground mb-4">
+              We've sent you a password reset link. Please check your email and follow the
+              instructions to reset your password.
             </p>
+            <div className="text-center">
+              <Link href="/login" className="text-sm underline underline-offset-4">
+                Back to Login
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : oauthInfo ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Set a Password</CardTitle>
+            <CardDescription>This account uses {oauthInfo.provider} login</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Your account was created using <strong>{oauthInfo.provider}</strong> authentication
+                and doesn't have a password set yet.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                You can still log in using your {oauthInfo.provider} account, or you can set a
+                password to enable email/password login.
+              </p>
+              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  💡 To set a password:
+                </p>
+                <ol className="text-sm text-blue-800 space-y-1 ml-4 list-decimal">
+                  <li>Continue with the password reset process</li>
+                  <li>Check your email for the reset link</li>
+                  <li>Set your new password</li>
+                  <li>You can now login with either {oauthInfo.provider} or email/password!</li>
+                </ol>
+              </div>
+              <Button
+                onClick={async () => {
+                  setOauthInfo(null)
+                  setIsLoading(true)
+                  try {
+                    const supabase = createClient()
+                    await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/update-password`,
+                    })
+                    setSuccess(true)
+                  } catch (error) {
+                    setError(error instanceof Error ? error.message : 'An error occurred')
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                className="w-full"
+                disabled={isLoading}
+              >
+                Send Password Setup Email
+              </Button>
+              <div className="text-center space-x-4">
+                <Link href="/login" className="text-sm underline underline-offset-4">
+                  Back to Login
+                </Link>
+                <button
+                  onClick={() => {
+                    setOauthInfo(null)
+                    setEmail('')
+                  }}
+                  className="text-sm underline underline-offset-4"
+                >
+                  Try Different Email
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -78,9 +178,13 @@ export function ForgotPasswordForm({ className, ...props }: React.ComponentProps
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
+                {error && (
+                  <div className="rounded-lg bg-red-50 p-3 border border-red-200">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Sending...' : 'Send reset email'}
+                  {isLoading ? 'Checking...' : 'Send reset email'}
                 </Button>
               </div>
               <div className="mt-4 text-center text-sm">
