@@ -62,6 +62,11 @@ CREATE TABLE events (
 - `NOT NULL`: event_name, date, organization_id, created_by, created_at, updated_at
 - `FOREIGN KEY`: organization_id → organizations(id) ON DELETE CASCADE
 - `FOREIGN KEY`: created_by → users(id) ON DELETE CASCADE
+- `CHECK`: event_name length between 3-200 characters (added Nov 6, 2025)
+- `CHECK`: location max 500 characters if provided (added Nov 6, 2025)
+- `CHECK`: description max 2000 characters if provided (added Nov 6, 2025)
+
+**Total Constraints**: 6
 
 **Indexes:**
 - `events_pkey`: PRIMARY KEY on id (UNIQUE, BTREE)
@@ -71,6 +76,9 @@ CREATE TABLE events (
 - `idx_events_created_at`: On created_at DESC (for recent events)
 - `idx_events_name`: On event_name (for search functionality)
 - `idx_events_org_date`: Composite on (organization_id, date DESC) (optimized for org event lists)
+- `idx_events_name_lower`: On LOWER(event_name) (case-insensitive search, added Nov 6, 2025)
+
+**Total Indexes**: 8
 
 **Triggers:**
 - `update_events_updated_at`: Auto-updates `updated_at` column on row modification
@@ -100,7 +108,7 @@ CREATE TABLE events (
 
 ### RLS Status
 - **Enabled**: ✅ TRUE
-- **Total Policies**: 6 policies
+- **Total Policies**: 5 policies (Updated Nov 6, 2025)
 
 ---
 
@@ -132,7 +140,7 @@ CREATE TABLE events (
 
 ---
 
-#### 2. **INSERT Policies** (2 policies)
+#### 2. **INSERT Policies** (1 policy)
 
 ##### `Admins and Attendance Takers can create events`
 - **Operation**: INSERT
@@ -150,14 +158,7 @@ CREATE TABLE events (
   )
   ```
 
-##### `members_can_create_events`
-- **Operation**: INSERT
-- **Roles**: public
-- **Type**: PERMISSIVE
-- **Logic**: Function-based policy (may be more lenient than above)
-- **With Check Expression**: `is_org_member(organization_id, auth.uid())`
-
-**Note**: There appears to be overlapping policies. The first policy is more restrictive (requires elevated roles), while the second allows any member. Review and consolidate if needed.
+**Note**: Previously conflicting policy `members_can_create_events` has been removed (Nov 6, 2025).
 
 ---
 
@@ -206,16 +207,174 @@ CREATE TABLE events (
 
 ### Event-Related Functions
 
-Based on the RLS policies, the following helper function is used:
+The following helper functions are available for event management:
 
 ```sql
 -- Check if user is organization member
 is_org_member(org_id uuid, user_auth_id uuid) → boolean
   -- Returns true if user is a member of the organization
-  -- Used in event viewing and creation policies
+  -- Used in event viewing policies
+
+-- Check if user can create events in organization
+can_create_event_in_org(p_organization_id uuid, p_user_id uuid DEFAULT auth.uid()) → boolean
+  -- Returns true if user has Owner, Admin, or Attendance Taker role
+  -- SECURITY DEFINER, STABLE
+  -- Added: Nov 6, 2025
+
+-- Check if user can edit/delete specific event
+can_manage_event(p_event_id uuid, p_user_id uuid DEFAULT auth.uid()) → boolean
+  -- Returns true if user is event creator OR organization Owner/Admin
+  -- SECURITY DEFINER, STABLE
+  -- Added: Nov 6, 2025
+
+-- Get event count for organization
+get_organization_event_count(p_organization_id uuid) → integer
+  -- Returns total number of events for an organization
+  -- SECURITY DEFINER, STABLE
+  -- Added: Nov 6, 2025
+
+-- Get upcoming events count for organization
+get_upcoming_events_count(p_organization_id uuid) → integer
+  -- Returns count of future events for an organization
+  -- SECURITY DEFINER, STABLE
+  -- Added: Nov 6, 2025
+
+-- Get user's created events count
+get_user_events_count(p_user_id uuid) → integer
+  -- Returns total number of events created by a user
+  -- SECURITY DEFINER, STABLE
+  -- Added: Nov 6, 2025
 ```
 
-**Note**: Additional event-specific functions may exist. Run query #11 from GET_EVENTS_TABLE_INFO.sql to discover them.
+**Function Details:**
+
+#### `can_create_event_in_org()`
+Checks if a user has permission to create events in an organization by verifying they have an elevated role.
+
+```sql
+CREATE OR REPLACE FUNCTION can_create_event_in_org(
+    p_organization_id uuid,
+    p_user_id uuid DEFAULT auth.uid()
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM organization_members
+        WHERE organization_id = p_organization_id
+            AND user_id = p_user_id
+            AND role IN ('Owner', 'Admin', 'Attendance Taker')
+    );
+$$;
+```
+
+#### `can_manage_event()`
+Checks if a user can edit or delete an event. Returns true if:
+- User is the event creator, OR
+- User is Owner/Admin of the organization
+
+```sql
+CREATE OR REPLACE FUNCTION can_manage_event(
+    p_event_id uuid,
+    p_user_id uuid DEFAULT auth.uid()
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM events e
+        WHERE e.id = p_event_id
+            AND e.created_by = p_user_id
+    ) OR EXISTS (
+        SELECT 1
+        FROM events e
+        JOIN organization_members om ON om.organization_id = e.organization_id
+        WHERE e.id = p_event_id
+            AND om.user_id = p_user_id
+            AND om.role IN ('Owner', 'Admin')
+    );
+$$;
+```
+
+---
+
+## Database Views
+
+### Event Views
+
+Three views have been created for common event queries:
+
+#### 1. `events_with_details`
+Complete event information with organization and creator details.
+
+```sql
+CREATE OR REPLACE VIEW events_with_details AS
+SELECT 
+    e.id,
+    e.event_name,
+    e.date,
+    e.organization_id,
+    e.description,
+    e.location,
+    e.created_by,
+    e.created_at,
+    e.updated_at,
+    -- Organization details
+    o.name as organization_name,
+    o.tag as organization_tag,
+    o.description as organization_description,
+    -- Creator details
+    u.name as creator_name,
+    u.email as creator_email,
+    u.user_type as creator_user_type
+FROM events e
+JOIN organizations o ON o.id = e.organization_id
+JOIN users u ON u.id = e.created_by;
+```
+
+**Use Case**: Fetch complete event details with related data in a single query.
+
+#### 2. `upcoming_events`
+Events scheduled in the future.
+
+```sql
+CREATE OR REPLACE VIEW upcoming_events AS
+SELECT 
+    e.*,
+    o.name as organization_name,
+    o.tag as organization_tag
+FROM events e
+JOIN organizations o ON o.id = e.organization_id
+WHERE e.date > now()
+ORDER BY e.date ASC;
+```
+
+**Use Case**: Quick access to future events without date filtering in queries.
+
+#### 3. `past_events`
+Events that have already occurred.
+
+```sql
+CREATE OR REPLACE VIEW past_events AS
+SELECT 
+    e.*,
+    o.name as organization_name,
+    o.tag as organization_tag
+FROM events e
+JOIN organizations o ON o.id = e.organization_id
+WHERE e.date <= now()
+ORDER BY e.date DESC;
+```
+
+**Use Case**: Historical event data, attendance reports, analytics.
+
+**Note**: All views have RLS enabled via `security_invoker = on`.
 
 ---
 
@@ -660,15 +819,13 @@ export interface EventQueryOptions extends EventFilters {
 | Action | Owner | Admin | Attendance Taker | Member | Non-Member |
 |--------|-------|-------|------------------|--------|------------|
 | View Events | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Create Events | ✅ | ✅ | ✅ | ⚠️* | ❌ |
-| Edit Own Events | ✅ | ✅ | ✅ | ✅** | ❌ |
+| Create Events | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Edit Own Events | ✅ | ✅ | ✅ | ❌* | ❌ |
 | Edit Any Events | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Delete Own Events | ✅ | ✅ | ✅ | ✅** | ❌ |
+| Delete Own Events | ✅ | ✅ | ✅ | ❌* | ❌ |
 | Delete Any Events | ✅ | ✅ | ❌ | ❌ | ❌ |
 
-*Note: There's a policy conflict - `members_can_create_events` allows any member, but `Admins and Attendance Takers can create events` restricts to elevated roles. Recommend consolidating.
-
-**If they created the event
+*Note: Regular Members cannot create events. Only Owner/Admin/Attendance Taker roles can create events. Policy conflict resolved Nov 6, 2025.
 
 ---
 
@@ -721,13 +878,23 @@ export interface EventQueryOptions extends EventFilters {
 
 ### Implementation Status
 - ✅ Database table created
-- ✅ RLS policies configured
-- ✅ Indexes optimized
+- ✅ RLS policies configured (5 policies, no conflicts)
+- ✅ Indexes optimized (8 indexes)
 - ✅ Foreign key relationships established
 - ✅ Triggers configured
+- ✅ Helper functions created (5 functions)
+- ✅ Views created (3 views)
+- ✅ Check constraints added (3 constraints)
 - ⚠️ API endpoints (partial - needs review)
 - ❌ Frontend components (pending)
 - ❌ Attendance tracking integration (future)
+
+### Database Summary (Updated Nov 6, 2025)
+- **Policies**: 5 (2 SELECT, 1 INSERT, 1 UPDATE, 1 DELETE)
+- **Indexes**: 8 (including case-insensitive name search)
+- **Constraints**: 6 (including data validation)
+- **Functions**: 5 (permission checks and counts)
+- **Views**: 3 (events_with_details, upcoming_events, past_events)
 
 ### Current Data
 - **Rows**: 0 (no events created yet)
@@ -737,10 +904,10 @@ export interface EventQueryOptions extends EventFilters {
 
 ### Known Issues / TODO
 
-1. **Policy Conflict**: Resolve overlapping INSERT policies
-   - `Admins and Attendance Takers can create events` (restrictive)
-   - `members_can_create_events` (permissive)
-   - **Action**: Decide on intended behavior and remove redundant policy
+1. ~~**Policy Conflict**: Resolve overlapping INSERT policies~~ ✅ **RESOLVED** (Nov 6, 2025)
+   - ~~`Admins and Attendance Takers can create events` (restrictive)~~
+   - ~~`members_can_create_events` (permissive)~~
+   - **Action**: ✅ Removed permissive policy, kept restrictive policy
 
 2. **API Implementation**: Review and complete event API endpoints
    - Implement filtering and pagination
