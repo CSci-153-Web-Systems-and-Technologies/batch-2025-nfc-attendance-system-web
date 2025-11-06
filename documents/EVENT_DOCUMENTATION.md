@@ -214,6 +214,21 @@ The following helper functions are available for event management:
 is_org_member(org_id uuid, user_auth_id uuid) → boolean
   -- Returns true if user is a member of the organization
   -- Used in event viewing policies
+  -- Implementation: Checks organization_members table directly with user_id
+  -- No JOIN with users table needed (user_id = auth.uid())
+  -- SECURITY DEFINER, STABLE
+
+-- Check if user is organization admin
+is_org_admin(org_id uuid, user_auth_id uuid) → boolean
+  -- Returns true if user has Owner or Admin role in the organization
+  -- Used in various permission checks
+  -- SECURITY DEFINER, STABLE
+
+-- Check if user is organization owner
+is_org_owner(org_id uuid, user_auth_id uuid) → boolean
+  -- Returns true if user is the owner of the organization
+  -- Used in ownership verification
+  -- SECURITY DEFINER, STABLE
 
 -- Check if user can create events in organization
 can_create_event_in_org(p_organization_id uuid, p_user_id uuid DEFAULT auth.uid()) → boolean
@@ -247,6 +262,79 @@ get_user_events_count(p_user_id uuid) → integer
 ```
 
 **Function Details:**
+
+#### `is_org_member()`
+Checks if a user is a member of an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_member(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organization_members om
+        WHERE om.organization_id = org_id
+        AND om.user_id = user_auth_id
+    );
+$$;
+```
+
+**Note**: This function was fixed on Nov 6, 2025 to remove incorrect JOIN with users table and u.auth_id reference. The `user_id` column in `organization_members` already contains `auth.uid()`.
+
+#### `is_org_admin()`
+Checks if a user has Owner or Admin role in an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_admin(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organization_members om
+        WHERE om.organization_id = org_id
+        AND om.user_id = user_auth_id
+        AND om.role IN ('Owner', 'Admin')
+    );
+$$;
+```
+
+**Note**: Fixed on Nov 6, 2025 to remove incorrect users table JOIN.
+
+#### `is_org_owner()`
+Checks if a user is the owner of an organization.
+
+```sql
+CREATE OR REPLACE FUNCTION is_org_owner(
+    org_id uuid,
+    user_auth_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 
+        FROM organizations o
+        WHERE o.id = org_id
+        AND o.owner_user_id = user_auth_id
+    );
+$$;
+```
+
+**Note**: Fixed on Nov 6, 2025 to remove incorrect users table JOIN.
 
 #### `can_create_event_in_org()`
 Checks if a user has permission to create events in an organization by verifying they have an elevated role.
