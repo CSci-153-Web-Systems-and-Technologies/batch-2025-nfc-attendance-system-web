@@ -47,7 +47,7 @@ export default async function OrganizationEventsPage({
     .from('events')
     .select(`
       *,
-      users!events_created_by_fkey(name, email)
+      users!fk_created_by_user(name, email)
     `)
     .eq('organization_id', id)
     .order('date', { ascending: false })
