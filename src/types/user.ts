@@ -1,6 +1,6 @@
 // User types for the NFC Attendance System
 
-export type UserType = 'Student' | 'Faculty' | 'Admin'
+export type UserType = 'Student' | 'Faculty'
 export type AuthProvider = 'email' | 'google' | 'github' | 'azure' | 'facebook'
 
 /**

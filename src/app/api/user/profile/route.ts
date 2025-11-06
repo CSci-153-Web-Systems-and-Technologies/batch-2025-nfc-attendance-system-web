@@ -80,7 +80,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    if (user_type && !['Student', 'Faculty', 'Admin'].includes(user_type)) {
+    if (user_type && !['Student', 'Faculty'].includes(user_type)) {
       return NextResponse.json(
         { error: 'Invalid user type' },
         { status: 400 }
