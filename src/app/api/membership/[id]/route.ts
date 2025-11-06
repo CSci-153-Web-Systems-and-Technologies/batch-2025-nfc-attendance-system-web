@@ -9,7 +9,7 @@ import type { UpdateMembershipInput } from '@/types/membership'
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const membershipId = params.id
+  const { id: membershipId } = await params
 
     const membership = await MembershipService.getMembershipWithDetails(
       membershipId
@@ -64,7 +64,7 @@ export async function GET(
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -76,7 +76,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const membershipId = params.id
+  const { id: membershipId } = await params
     const body = await request.json()
     const { role } = body as UpdateMembershipInput
 
@@ -149,7 +149,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -161,7 +161,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const membershipId = params.id
+  const { id: membershipId } = await params
 
     // Get the membership to check organization and role
     const membership = await MembershipService.getMembershipById(membershipId)
