@@ -1,18 +1,86 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Info, Plus, Building2, Users, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
-// Empty arrays - will be populated with actual data from database later
-const mockEvents = {
-  onGoing: [],
-  upcoming: [],
-  finished: []
+// Event shape returned by /api/event (EventWithOrganization)
+type DashboardEvent = {
+  id: string
+  event_name: string
+  date: string
+  organization_id: string
+  description: string | null
+  location: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  organization: {
+    id: string
+    name: string
+  }
 }
 
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [onGoing, setOnGoing] = useState<DashboardEvent[]>([])
+  const [upcoming, setUpcoming] = useState<DashboardEvent[]>([])
+  const [finished, setFinished] = useState<DashboardEvent[]>([])
+
+  // Fetch events for dashboard
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const [upcomingRes, pastRes] = await Promise.all([
+          fetch('/api/event?upcoming=true&limit=20', { cache: 'no-store' }),
+          fetch('/api/event?past=true&limit=20', { cache: 'no-store' }),
+        ])
+
+        if (!upcomingRes.ok) {
+          throw new Error('Failed to load upcoming events')
+        }
+        if (!pastRes.ok) {
+          throw new Error('Failed to load past events')
+        }
+
+        const upcomingData: DashboardEvent[] = await upcomingRes.json()
+        const pastData: DashboardEvent[] = await pastRes.json()
+
+        // Compute today's (ongoing) events using local date
+        const today = new Date()
+        const isSameDay = (a: Date, b: Date) =>
+          a.getFullYear() === b.getFullYear() &&
+          a.getMonth() === b.getMonth() &&
+          a.getDate() === b.getDate()
+
+        const todayEvents = upcomingData.filter((e) =>
+          isSameDay(new Date(e.date), today)
+        )
+
+        // Upcoming (exclude today to avoid duplication)
+        const futureEvents = upcomingData.filter(
+          (e) => !isSameDay(new Date(e.date), today)
+        )
+
+        setOnGoing(todayEvents)
+        setUpcoming(futureEvents)
+        setFinished(pastData)
+      } catch (err: any) {
+        console.error('Dashboard events load error:', err)
+        setError(err.message || 'Failed to load events')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEvents()
+  }, [])
+
   const [currentDate, setCurrentDate] = useState(new Date(2025, 7, 15)) // August 15, 2025
 
   // Calendar logic
@@ -138,7 +206,11 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold text-gray-900">On Going</h2>
               </div>
               <div className="bg-violet-50/50 rounded-xl p-8 border border-violet-100">
-                {mockEvents.onGoing.length === 0 ? (
+                {loading ? (
+                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                ) : error ? (
+                  <div className="text-center text-sm text-red-600">{error}</div>
+                ) : onGoing.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center">
                     <div className="bg-violet-600 rounded-lg px-6 py-3">
                       <p className="text-white font-medium">No Current Events On Going</p>
@@ -146,25 +218,29 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {mockEvents.onGoing.map((event: any) => (
+                    {onGoing.map((event) => (
                       <div
                         key={event.id}
                         className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-violet-100"
                       >
-                        <div className={`bg-gradient-to-r ${event.color} rounded-lg p-4 text-white`}>
+                        <div className="rounded-lg p-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-base">{event.title}</h3>
-                              <p className="text-sm text-white/90 mt-1">{event.description}</p>
+                              <h3 className="font-semibold text-base">{event.event_name}</h3>
+                              <p className="text-xs text-white/90 mt-1">{event.organization.name}</p>
                             </div>
                             <Button
                               size="sm"
                               className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs px-3"
+                              asChild
                             >
-                              Info
+                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
                             </Button>
                           </div>
-                          <p className="text-sm text-white/90">{event.time}</p>
+                          <p className="text-sm text-white/90">
+                            {new Date(event.date).toLocaleString()}
+                            {event.location ? ` • ${event.location}` : ''}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -180,7 +256,9 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold text-gray-900">Upcoming Events</h2>
               </div>
               <div className="bg-violet-50/50 rounded-xl p-8 border border-violet-100">
-                {mockEvents.upcoming.length === 0 ? (
+                {loading ? (
+                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                ) : upcoming.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center">
                     <div className="bg-violet-600 rounded-lg px-6 py-3">
                       <p className="text-white font-medium">No Upcoming Events</p>
@@ -188,25 +266,29 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {mockEvents.upcoming.map((event: any) => (
+                    {upcoming.map((event) => (
                       <div
                         key={event.id}
                         className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-violet-100"
                       >
-                        <div className={`bg-gradient-to-r ${event.color} rounded-lg p-4 text-white`}>
+                        <div className="rounded-lg p-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-base">{event.title}</h3>
-                              <p className="text-sm text-white/90 mt-1">{event.description}</p>
+                              <h3 className="font-semibold text-base">{event.event_name}</h3>
+                              <p className="text-xs text-white/90 mt-1">{event.organization.name}</p>
                             </div>
                             <Button
                               size="sm"
                               className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs px-3"
+                              asChild
                             >
-                              Info
+                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
                             </Button>
                           </div>
-                          <p className="text-sm text-white/90">{event.time}</p>
+                          <p className="text-sm text-white/90">
+                            {new Date(event.date).toLocaleString()}
+                            {event.location ? ` • ${event.location}` : ''}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -222,7 +304,9 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold text-gray-900">Finished Events</h2>
               </div>
               <div className="bg-violet-50/50 rounded-xl p-8 border border-violet-100">
-                {mockEvents.finished.length === 0 ? (
+                {loading ? (
+                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                ) : finished.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center">
                     <div className="bg-violet-600 rounded-lg px-6 py-3">
                       <p className="text-white font-medium">No Past Events</p>
@@ -230,21 +314,29 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {mockEvents.finished.map((event: any) => (
+                    {finished.map((event) => (
                       <div
                         key={event.id}
                         className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-violet-100"
                       >
-                        <div className={`bg-gradient-to-r ${event.color} rounded-lg p-4 text-white`}>
+                        <div className="rounded-lg p-4 bg-gradient-to-r from-gray-600 to-slate-600 text-white">
                           <div className="flex justify-between items-start">
-                            <h3 className="font-semibold text-base">{event.title}</h3>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-base">{event.event_name}</h3>
+                              <p className="text-xs text-white/90 mt-1">{event.organization.name}</p>
+                            </div>
                             <Button
                               size="sm"
                               className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs px-3"
+                              asChild
                             >
-                              Info
+                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
                             </Button>
                           </div>
+                          <p className="text-sm text-white/90">
+                            {new Date(event.date).toLocaleString()}
+                            {event.location ? ` • ${event.location}` : ''}
+                          </p>
                         </div>
                       </div>
                     ))}
