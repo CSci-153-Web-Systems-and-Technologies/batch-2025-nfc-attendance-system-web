@@ -8,7 +8,7 @@ import { createClient } from '@/lib/server'
  */
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const targetUserId = params.userId
+  const { userId: targetUserId } = await params
 
     // Users can only view their own tags
     if (targetUserId !== user.id) {
