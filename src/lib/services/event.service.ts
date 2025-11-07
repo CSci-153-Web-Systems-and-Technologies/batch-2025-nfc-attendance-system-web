@@ -10,28 +10,65 @@ import type {
 
 export class EventService {
   /**
+   * Validate event input against database constraints
+   * Returns error message if validation fails, null if valid
+   */
+  static validateEventInput(input: CreateEventInput | UpdateEventInput): string | null {
+    // Validate event_name length (3-200 characters)
+    if ('event_name' in input && input.event_name) {
+      if (input.event_name.length < 3) {
+        return 'Event name must be at least 3 characters long'
+      }
+      if (input.event_name.length > 200) {
+        return 'Event name must not exceed 200 characters'
+      }
+    }
+
+    // Validate location length (max 500 characters)
+    if ('location' in input && input.location) {
+      if (input.location.length > 500) {
+        return 'Location must not exceed 500 characters'
+      }
+    }
+
+    // Validate description length (max 2000 characters)
+    if ('description' in input && input.description) {
+      if (input.description.length > 2000) {
+        return 'Description must not exceed 2000 characters'
+      }
+    }
+
+    return null
+  }
+  /**
    * Create a new event
    * Only authorized members (Owner, Admin, Attendance Taker) can create events
+   * Uses can_create_event_in_org() database function for permission check
    */
   static async createEvent(
     userId: string,
     input: CreateEventInput
   ): Promise<Event | null> {
+    // Validate input against database constraints
+    const validationError = this.validateEventInput(input)
+    if (validationError) {
+      console.error('Validation error:', validationError)
+      return null
+    }
+
     const supabase = await createClient()
 
-    // Verify user has permission to create events in this organization
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', input.organization_id)
-      .eq('user_id', userId)
-      .single()
+    // Use database function to check permission
+    const { data: hasPermission, error: permError } = await supabase.rpc(
+      'can_create_event_in_org',
+      {
+        p_organization_id: input.organization_id,
+        p_user_id: userId,
+      }
+    )
 
-    if (
-      !member ||
-      !['Owner', 'Admin', 'Attendance Taker'].includes(member.role)
-    ) {
-      console.error('User does not have permission to create events')
+    if (permError || !hasPermission) {
+      console.error('User does not have permission to create events:', permError)
       return null
     }
 
@@ -100,6 +137,7 @@ export class EventService {
 
   /**
    * Get event with full details including organization and creator info
+   * Uses events_with_details view for optimized query
    */
   static async getEventWithDetails(
     userId: string,
@@ -107,15 +145,10 @@ export class EventService {
   ): Promise<EventWithDetails | null> {
     const supabase = await createClient()
 
+    // Query the events_with_details view
     const { data, error } = await supabase
-      .from('events')
-      .select(
-        `
-        *,
-        organizations!inner(id, name),
-        users!events_created_by_fkey(id, name, email)
-      `
-      )
+      .from('events_with_details')
+      .select('*')
       .eq('id', eventId)
       .single()
 
@@ -124,7 +157,7 @@ export class EventService {
       return null
     }
 
-    // Verify user is a member of the organization
+    // Verify user is a member of the organization (RLS will also enforce this)
     const { data: member } = await supabase
       .from('organization_members')
       .select('id')
@@ -137,22 +170,25 @@ export class EventService {
       return null
     }
 
-    // Transform the data to match our type
-    const organization = Array.isArray(data.organizations)
-      ? data.organizations[0]
-      : data.organizations
-    const creator = Array.isArray(data.users) ? data.users[0] : data.users
-
+    // Transform view data to match EventWithDetails type
     return {
-      ...data,
+      id: data.id,
+      event_name: data.event_name,
+      date: data.date,
+      organization_id: data.organization_id,
+      description: data.description,
+      location: data.location,
+      created_by: data.created_by,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
       organization: {
-        id: organization.id,
-        name: organization.name,
+        id: data.organization_id,
+        name: data.organization_name,
       },
       created_by_user: {
-        id: creator.id,
-        name: creator.name,
-        email: creator.email,
+        id: data.created_by,
+        name: data.creator_name,
+        email: data.creator_email,
       },
     }
   }
@@ -285,34 +321,34 @@ export class EventService {
 
   /**
    * Update an event
-   * Only authorized members (Owner, Admin, Attendance Taker) can update events
+   * Only event creator OR organization Owner/Admin can update events
+   * Uses can_manage_event() database function for permission check
    */
   static async updateEvent(
     userId: string,
     eventId: string,
     input: UpdateEventInput
   ): Promise<Event | null> {
-    const supabase = await createClient()
-
-    // First get the event to check organization
-    const event = await this.getEventById(userId, eventId)
-    if (!event) {
+    // Validate input against database constraints
+    const validationError = this.validateEventInput(input)
+    if (validationError) {
+      console.error('Validation error:', validationError)
       return null
     }
 
-    // Verify user has permission to update events in this organization
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', event.organization_id)
-      .eq('user_id', userId)
-      .single()
+    const supabase = await createClient()
 
-    if (
-      !member ||
-      !['Owner', 'Admin', 'Attendance Taker'].includes(member.role)
-    ) {
-      console.error('User does not have permission to update events')
+    // Use database function to check permission
+    const { data: canManage, error: permError } = await supabase.rpc(
+      'can_manage_event',
+      {
+        p_event_id: eventId,
+        p_user_id: userId,
+      }
+    )
+
+    if (permError || !canManage) {
+      console.error('User does not have permission to update this event:', permError)
       return null
     }
 
@@ -340,7 +376,8 @@ export class EventService {
 
   /**
    * Delete an event
-   * Only Owners and Admins can delete events
+   * Only event creator OR organization Owner/Admin can delete events
+   * Uses can_manage_event() database function for permission check
    */
   static async deleteEvent(
     userId: string,
@@ -348,22 +385,17 @@ export class EventService {
   ): Promise<boolean> {
     const supabase = await createClient()
 
-    // First get the event to check organization
-    const event = await this.getEventById(userId, eventId)
-    if (!event) {
-      return false
-    }
+    // Use database function to check permission
+    const { data: canManage, error: permError } = await supabase.rpc(
+      'can_manage_event',
+      {
+        p_event_id: eventId,
+        p_user_id: userId,
+      }
+    )
 
-    // Verify user has permission to delete events (Owner or Admin only)
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', event.organization_id)
-      .eq('user_id', userId)
-      .single()
-
-    if (!member || !['Owner', 'Admin'].includes(member.role)) {
-      console.error('User does not have permission to delete events')
+    if (permError || !canManage) {
+      console.error('User does not have permission to delete this event:', permError)
       return false
     }
 
@@ -379,25 +411,166 @@ export class EventService {
 
   /**
    * Get upcoming events for a user (events in the future)
+   * Uses upcoming_events view for optimized query
    */
   static async getUpcomingEvents(
     userId: string,
     limit: number = 10
   ): Promise<EventWithOrganization[]> {
-    const now = new Date().toISOString()
-    const events = await this.getUserEvents(userId, { from_date: now })
-    return events.slice(0, limit)
+    const supabase = await createClient()
+
+    // First get user's organizations
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', userId)
+
+    if (!memberships || memberships.length === 0) {
+      return []
+    }
+
+    const organizationIds = memberships.map((m) => m.organization_id)
+
+    // Query the upcoming_events view
+    const { data, error } = await supabase
+      .from('upcoming_events')
+      .select('*')
+      .in('organization_id', organizationIds)
+      .limit(limit)
+
+    if (error) {
+      console.error('Error fetching upcoming events:', error)
+      return []
+    }
+
+    // Transform view data to match EventWithOrganization type
+    return data.map((event) => ({
+      id: event.id,
+      event_name: event.event_name,
+      date: event.date,
+      organization_id: event.organization_id,
+      description: event.description,
+      location: event.location,
+      created_by: event.created_by,
+      created_at: event.created_at,
+      updated_at: event.updated_at,
+      organization: {
+        id: event.organization_id,
+        name: event.organization_name,
+      },
+    }))
   }
 
   /**
    * Get past events for a user
+   * Uses past_events view for optimized query
    */
   static async getPastEvents(
     userId: string,
     limit: number = 10
   ): Promise<EventWithOrganization[]> {
-    const now = new Date().toISOString()
-    const events = await this.getUserEvents(userId, { to_date: now })
-    return events.slice(0, limit)
+    const supabase = await createClient()
+
+    // First get user's organizations
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', userId)
+
+    if (!memberships || memberships.length === 0) {
+      return []
+    }
+
+    const organizationIds = memberships.map((m) => m.organization_id)
+
+    // Query the past_events view
+    const { data, error } = await supabase
+      .from('past_events')
+      .select('*')
+      .in('organization_id', organizationIds)
+      .limit(limit)
+
+    if (error) {
+      console.error('Error fetching past events:', error)
+      return []
+    }
+
+    // Transform view data to match EventWithOrganization type
+    return data.map((event) => ({
+      id: event.id,
+      event_name: event.event_name,
+      date: event.date,
+      organization_id: event.organization_id,
+      description: event.description,
+      location: event.location,
+      created_by: event.created_by,
+      created_at: event.created_at,
+      updated_at: event.updated_at,
+      organization: {
+        id: event.organization_id,
+        name: event.organization_name,
+      },
+    }))
+  }
+
+  /**
+   * Get event count for an organization
+   * Uses get_organization_event_count() database function
+   */
+  static async getOrganizationEventCount(
+    organizationId: string
+  ): Promise<number> {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_organization_event_count', {
+      p_organization_id: organizationId,
+    })
+
+    if (error) {
+      console.error('Error getting organization event count:', error)
+      return 0
+    }
+
+    return data || 0
+  }
+
+  /**
+   * Get upcoming event count for an organization
+   * Uses get_upcoming_events_count() database function
+   */
+  static async getUpcomingEventsCount(
+    organizationId: string
+  ): Promise<number> {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_upcoming_events_count', {
+      p_organization_id: organizationId,
+    })
+
+    if (error) {
+      console.error('Error getting upcoming events count:', error)
+      return 0
+    }
+
+    return data || 0
+  }
+
+  /**
+   * Get event count for a user (events they created)
+   * Uses get_user_events_count() database function
+   */
+  static async getUserEventsCount(userId: string): Promise<number> {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_user_events_count', {
+      p_user_id: userId,
+    })
+
+    if (error) {
+      console.error('Error getting user events count:', error)
+      return 0
+    }
+
+    return data || 0
   }
 }
