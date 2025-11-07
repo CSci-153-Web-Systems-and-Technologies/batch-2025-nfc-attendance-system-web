@@ -3,6 +3,7 @@ import { createClient } from '@/lib/server'
 import { MembershipService } from '@/lib/services/membership.service'
 import { OrganizationService } from '@/lib/services/organization.service'
 import { MembersView } from '@/components/organizations/members-view'
+import type { MembershipRole } from '@/types/membership'
 
 interface MembersPageProps {
   params: Promise<{
@@ -41,14 +42,29 @@ export default async function MembersPage({ params }: MembersPageProps) {
   }
 
   // Get all members of the organization
-  const members = await MembershipService.getOrganizationMembers(organizationId)
+  // Initial paginated load (first 20) and total count
+  const [members, total] = await Promise.all([
+    MembershipService.getOrganizationMembersPaged(organizationId, { limit: 20, offset: 0 }),
+    MembershipService.countMemberships({ organization_id: organizationId }),
+  ])
+
+  console.log('MembersPage - Server side:', { 
+    organizationId, 
+    membersCount: members.length, 
+    total,
+    firstMember: members[0] 
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">
       <MembersView 
         organization={organization} 
-        members={members}
-        currentUserRole={userMembership.role}
+        initialMembers={members}
+        total={total}
+        pageSize={20}
+        organizationId={organizationId}
+        currentUserRole={userMembership.role as MembershipRole}
+        currentUserId={user.id}
       />
     </div>
   )
