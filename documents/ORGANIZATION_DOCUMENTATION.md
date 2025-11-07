@@ -184,7 +184,9 @@ CREATE TABLE organization_join_requests (
    - Uses `is_org_member()` function
 
 5. **`Owners and Admins can update members`** (UPDATE)
-   - Can modify member roles
+  - Can modify member roles (non-Owner rows only)
+  - Cannot change any row to `Owner` (use transfer ownership)
+  - Cannot modify own membership (no self-role changes)
 
 6. **`Users can leave organizations`** (DELETE)
    - Members can remove themselves (except Owners)
