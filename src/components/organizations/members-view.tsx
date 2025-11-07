@@ -78,8 +78,6 @@ export function MembersView({
         return <Crown className="w-4 h-4 text-amber-600" />
       case 'Admin':
         return <Shield className="w-4 h-4 text-purple-600" />
-      case 'Attendance Taker':
-        return <UserCheck className="w-4 h-4 text-blue-600" />
       case 'Member':
         return <User className="w-4 h-4 text-gray-600" />
     }
@@ -92,8 +90,6 @@ export function MembersView({
         return 'bg-amber-100 text-amber-800 border-amber-200'
       case 'Admin':
         return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'Attendance Taker':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'Member':
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -114,7 +110,6 @@ export function MembersView({
     All: members.length,
     Owner: members.filter(m => m.role === 'Owner').length,
     Admin: members.filter(m => m.role === 'Admin').length,
-    'Attendance Taker': members.filter(m => m.role === 'Attendance Taker').length,
     Member: members.filter(m => m.role === 'Member').length,
   }
 
@@ -233,7 +228,7 @@ export function MembersView({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
@@ -264,16 +259,6 @@ export function MembersView({
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-200" onClick={() => setSelectedRole('Attendance Taker')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Takers</p>
-              <p className="text-2xl font-bold text-blue-600">{roleCount['Attendance Taker']}</p>
-            </div>
-            <UserCheck className="w-8 h-8 text-blue-600" />
-          </div>
-        </Card>
-
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-200" onClick={() => setSelectedRole('Member')}>
           <div className="flex items-center justify-between">
             <div>
@@ -299,7 +284,7 @@ export function MembersView({
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(['All', 'Owner', 'Admin', 'Attendance Taker', 'Member'] as const).map((role) => (
+            {(['All', 'Owner', 'Admin', 'Member'] as const).map((role) => (
               <Button
                 key={role}
                 variant={selectedRole === role ? 'default' : 'outline'}
