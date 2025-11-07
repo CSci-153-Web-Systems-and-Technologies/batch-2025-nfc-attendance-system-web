@@ -276,6 +276,50 @@ export class MembershipService {
   }
 
   /**
+   * Get organization's members with pagination and optional role filter
+   */
+  static async getOrganizationMembersPaged(
+    organizationId: string,
+    options?: { limit?: number; offset?: number; role?: MembershipRole }
+  ): Promise<MembershipWithUser[]> {
+    const supabase = await createClient()
+
+    const limit = options?.limit ?? 20
+    const offset = options?.offset ?? 0
+
+    let query = supabase
+      .from('organization_members')
+      .select(
+        `
+        *,
+        user:users (
+          id,
+          name,
+          email,
+          user_type,
+          nfc_tag_id
+        )
+      `
+      )
+      .eq('organization_id', organizationId)
+      .order('joined_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (options?.role) {
+      query = query.eq('role', options.role)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching paged organization members:', error)
+      return []
+    }
+
+    return (data || []) as MembershipWithUser[]
+  }
+
+  /**
    * Get user's membership in a specific organization
    */
   static async getUserMembershipInOrganization(

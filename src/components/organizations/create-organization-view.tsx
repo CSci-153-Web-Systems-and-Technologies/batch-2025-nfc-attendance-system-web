@@ -17,6 +17,7 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    tag: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -27,6 +28,11 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
 
     if (!formData.name.trim()) {
       setError('Organization name is required')
+      return
+    }
+
+    if (formData.tag.trim() && !/^[A-Z0-9]{2,10}$/.test(formData.tag.trim())) {
+      setError('Tag must be 2-10 uppercase letters/numbers (e.g., FOC, CS101)')
       return
     }
 
@@ -41,6 +47,7 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
         body: JSON.stringify({
           name: formData.name,
           description: formData.description || null,
+          tag: formData.tag.trim() || null,
         }),
       })
 
@@ -119,6 +126,26 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
               />
               <p className="text-sm text-gray-500">
                 Choose a clear and descriptive name for your organization
+              </p>
+            </div>
+
+            {/* Organization Tag */}
+            <div className="space-y-2">
+              <Label htmlFor="tag">
+                Organization Tag (Optional)
+              </Label>
+              <Input
+                id="tag"
+                type="text"
+                placeholder="e.g., FOC, CS, TECH"
+                value={formData.tag}
+                onChange={(e) => setFormData({ ...formData, tag: e.target.value.toUpperCase() })}
+                disabled={isSubmitting}
+                className="w-full"
+                maxLength={10}
+              />
+              <p className="text-sm text-gray-500">
+                A short abbreviation (2-10 characters, uppercase letters/numbers) used to identify your organization
               </p>
             </div>
 
