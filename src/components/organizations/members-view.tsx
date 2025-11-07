@@ -52,6 +52,12 @@ export function MembersView({
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const isInitialMount = useRef(true)
+  const [totalRoleCount, setTotalRoleCount] = useState(() => ({
+    All: initialTotal,
+    Owner: initialMembers.filter(m => m.role === 'Owner').length,
+    Admin: initialMembers.filter(m => m.role === 'Admin').length,
+    Member: initialMembers.filter(m => m.role === 'Member').length,
+  }))
 
   // Debug logging
   useEffect(() => {
@@ -106,12 +112,7 @@ export function MembersView({
   }
 
   // Get member count by role
-  const roleCount = {
-    All: members.length,
-    Owner: members.filter(m => m.role === 'Owner').length,
-    Admin: members.filter(m => m.role === 'Admin').length,
-    Member: members.filter(m => m.role === 'Member').length,
-  }
+  const roleCount = totalRoleCount
 
   // Fetch helpers
   const fetchMembers = async (opts: { reset?: boolean } = {}) => {
@@ -130,7 +131,18 @@ export function MembersView({
       setMembers((prev) => [...prev, ...newMembers])
       setOffset((prev) => prev + newMembers.length)
     }
-    if (typeof newTotal === 'number') setTotal(newTotal)
+    if (typeof newTotal === 'number') {
+      setTotal(newTotal)
+      // Update total role counts only when fetching all members
+      if (selectedRole === 'All') {
+        setTotalRoleCount({
+          All: newTotal,
+          Owner: newMembers.filter(m => m.role === 'Owner').length,
+          Admin: newMembers.filter(m => m.role === 'Admin').length,
+          Member: newMembers.filter(m => m.role === 'Member').length,
+        })
+      }
+    }
   }
 
   // Reset and refetch when role filter changes
@@ -179,6 +191,19 @@ export function MembersView({
       }
       const { membership } = await res.json()
       setMembers((prev) => prev.map((m) => (m.id === membership.id ? { ...m, role: membership.role } : m)))
+      
+      // Update total role counts
+      setTotalRoleCount((prev) => {
+        const oldMember = members.find(m => m.id === membershipId)
+        if (!oldMember) return prev
+        
+        const newCounts = { ...prev }
+        const oldRole = oldMember.role as keyof typeof prev
+        const newRole = role as keyof typeof prev
+        newCounts[oldRole] = Math.max(newCounts[oldRole] - 1, 0)
+        newCounts[newRole] = newCounts[newRole] + 1
+        return newCounts
+      })
     } catch (e) {
       console.error(e)
       alert((e as Error).message)
@@ -196,8 +221,20 @@ export function MembersView({
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || 'Failed to remove member')
       }
+      const memberToRemove = members.find(m => m.id === membershipId)
       setMembers((prev) => prev.filter((m) => m.id !== membershipId))
       setTotal((prev) => Math.max(prev - 1, 0))
+      
+      // Update total role counts
+      if (memberToRemove) {
+        setTotalRoleCount((prev) => {
+          const newCounts = { ...prev }
+          const role = memberToRemove.role as keyof typeof prev
+          newCounts[role] = Math.max(newCounts[role] - 1, 0)
+          newCounts.All = Math.max(newCounts.All - 1, 0)
+          return newCounts
+        })
+      }
     } catch (e) {
       console.error(e)
       alert((e as Error).message)
