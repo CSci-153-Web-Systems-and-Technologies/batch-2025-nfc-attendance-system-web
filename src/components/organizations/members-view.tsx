@@ -51,6 +51,14 @@ export function MembersView({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const isInitialMount = useRef(true)
+
+  // Debug logging
+  useEffect(() => {
+    console.log('MembersView - initialMembers:', initialMembers)
+    console.log('MembersView - total:', initialTotal)
+    console.log('MembersView - members state:', members)
+  }, [])
 
   // Filter members based on search and role (search is client-side for now)
   const filteredMembers = members.filter((member) => {
@@ -132,6 +140,12 @@ export function MembersView({
 
   // Reset and refetch when role filter changes
   useEffect(() => {
+    // Skip on initial mount - use server-side data
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    
     // For server-side role filter; search stays client-side
     setIsRefreshing(true)
     fetchMembers({ reset: true }).finally(() => setIsRefreshing(false))
@@ -300,7 +314,12 @@ export function MembersView({
       </Card>
 
       {/* Members List */}
-      {filteredMembers.length === 0 ? (
+      {isRefreshing ? (
+        <Card className="p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading members...</p>
+        </Card>
+      ) : filteredMembers.length === 0 ? (
         <Card className="p-12 text-center">
           <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No members found</h3>
@@ -308,6 +327,9 @@ export function MembersView({
             {searchQuery || selectedRole !== 'All'
               ? 'Try adjusting your search or filter criteria.'
               : 'This organization has no members yet.'}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Debug: Total={total}, Members={members.length}, InitialMembers={initialMembers.length}
           </p>
         </Card>
       ) : (

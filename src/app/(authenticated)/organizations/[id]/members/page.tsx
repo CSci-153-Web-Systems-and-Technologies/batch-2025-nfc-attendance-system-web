@@ -48,6 +48,13 @@ export default async function MembersPage({ params }: MembersPageProps) {
     MembershipService.countMemberships({ organization_id: organizationId }),
   ])
 
+  console.log('MembersPage - Server side:', { 
+    organizationId, 
+    membersCount: members.length, 
+    total,
+    firstMember: members[0] 
+  })
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">
       <MembersView 

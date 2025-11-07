@@ -181,6 +181,7 @@ CREATE TABLE organization_join_requests (
    - Checks: `auth.uid() = user_id`
 
 4. **`members_can_view_other_members`** (SELECT) ⚠️ CRITICAL
+<<<<<<< Updated upstream
    - Organization members can view other members
    - Uses `is_org_member()` function
    - **Without this policy, members list will only show yourself**
@@ -196,18 +197,23 @@ CREATE TABLE organization_join_requests (
    - Checks: `auth.uid() = user_id`
 
 4. **`members_can_view_other_members`** (SELECT)
+=======
+>>>>>>> Stashed changes
    - Organization members can view other members
    - Uses `is_org_member()` function
+   - **Without this policy, members list will only show yourself**
+   - Required for members page to function
 
 5. **`Owners and Admins can update members`** (UPDATE)
-  - Can modify member roles
-  - Cannot update rows where current role is `Owner`
-  - Cannot change any row to `Owner` (use transfer ownership flow)
-  - Cannot modify own membership (no self-role changes)
+   - Can modify member roles (Owner and Admin permitted)
+   - Cannot update rows where current role is `Owner`
+   - Cannot change any row to `Owner` (use transfer ownership flow)
+   - Cannot modify own membership (no self-role changes)
 
-6. **`admins_can_update_members`** (UPDATE)
-  - Function-based update policy
-  - Enforces: non-owner target, non-owner new role, and no self-modification
+6. **`admins_can_update_members`** (UPDATE) ⚠️ REQUIRED FOR ADMIN CONTROLS
+   - Function-based update policy
+   - Enforces: non-owner target, non-owner new role, and no self-modification
+   - **Without this policy, admins cannot promote/demote members**
 
 7. **`Users can leave organizations`** (DELETE)
    - Members can remove themselves
