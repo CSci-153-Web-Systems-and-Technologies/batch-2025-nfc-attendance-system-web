@@ -5,6 +5,49 @@
 
 ---
 
+## ⚠️ REQUIRED DATABASE SETUP
+
+**CRITICAL:** The following RLS policies must be created in Supabase for the members page to work correctly:
+
+```sql
+-- 1. Allow members to view other members in same organization
+-- (Without this, members list will only show yourself)
+CREATE POLICY members_can_view_other_members
+ON organization_members FOR SELECT
+USING (is_org_member(organization_id, auth.uid()));
+
+-- 2. Allow admins to update member roles (non-owner, no self-modify)
+CREATE POLICY admins_can_update_members
+ON organization_members FOR UPDATE
+USING (
+  is_org_admin(organization_id, auth.uid())
+  AND role <> 'Owner'
+  AND user_id <> auth.uid()
+)
+WITH CHECK (
+  is_org_admin(organization_id, auth.uid())
+  AND role <> 'Owner'
+  AND user_id <> auth.uid()
+);
+
+-- 3. Tighten owner update policy (prevent owner changes and self-modification)
+DROP POLICY IF EXISTS update_members_by_owner ON organization_members;
+CREATE POLICY update_members_by_owner
+ON organization_members FOR UPDATE
+USING (
+  is_org_owner(organization_id, auth.uid())
+  AND role <> 'Owner'
+  AND user_id <> auth.uid()
+)
+WITH CHECK (
+  is_org_owner(organization_id, auth.uid())
+  AND role <> 'Owner'
+  AND user_id <> auth.uid()
+);
+```
+
+---
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Database Structure](#database-structure)
@@ -123,6 +166,8 @@ CREATE TABLE organization_join_requests (
 
 ### Organization Members Table Policies
 
+**TOTAL POLICIES: 6** (2 INSERT, 2 SELECT, 2 UPDATE, 1 DELETE)
+
 1. **`Owners and Admins can add members`** (INSERT)
    - Only Owners and Admins can add new members
    - Uses EXISTS subquery to check requester's role
@@ -135,19 +180,40 @@ CREATE TABLE organization_join_requests (
    - Users can see organizations they belong to
    - Checks: `auth.uid() = user_id`
 
-4. **`members_can_view_other_members`** (SELECT)
+4. **`members_can_view_other_members`** (SELECT) ⚠️ CRITICAL
+<<<<<<< Updated upstream
    - Organization members can view other members
    - Uses `is_org_member()` function
+   - **Without this policy, members list will only show yourself**
+   - Required for members page to function
+   - Uses EXISTS subquery to check requester's role
+
+2. **`admins_can_add_members`** (INSERT)
+   - Function-based policy for adding members
+   - Checks via `is_org_admin()` or `is_org_owner()`
+
+3. **`Users can view their own memberships`** (SELECT)
+   - Users can see organizations they belong to
+   - Checks: `auth.uid() = user_id`
+
+4. **`members_can_view_other_members`** (SELECT)
+=======
+>>>>>>> Stashed changes
+   - Organization members can view other members
+   - Uses `is_org_member()` function
+   - **Without this policy, members list will only show yourself**
+   - Required for members page to function
 
 5. **`Owners and Admins can update members`** (UPDATE)
-  - Can modify member roles
-  - Cannot update rows where current role is `Owner`
-  - Cannot change any row to `Owner` (use transfer ownership flow)
-  - Cannot modify own membership (no self-role changes)
+   - Can modify member roles (Owner and Admin permitted)
+   - Cannot update rows where current role is `Owner`
+   - Cannot change any row to `Owner` (use transfer ownership flow)
+   - Cannot modify own membership (no self-role changes)
 
-6. **`admins_can_update_members`** (UPDATE)
-  - Function-based update policy
-  - Enforces: non-owner target, non-owner new role, and no self-modification
+6. **`admins_can_update_members`** (UPDATE) ⚠️ REQUIRED FOR ADMIN CONTROLS
+   - Function-based update policy
+   - Enforces: non-owner target, non-owner new role, and no self-modification
+   - **Without this policy, admins cannot promote/demote members**
 
 7. **`Users can leave organizations`** (DELETE)
    - Members can remove themselves
