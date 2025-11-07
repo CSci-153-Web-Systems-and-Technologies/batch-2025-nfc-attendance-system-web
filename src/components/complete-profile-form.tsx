@@ -93,7 +93,6 @@ export function CompleteProfileForm() {
               >
                 <option value="Student">Student</option>
                 <option value="Faculty">Faculty</option>
-                <option value="Admin">Admin</option>
               </select>
             </div>
 
