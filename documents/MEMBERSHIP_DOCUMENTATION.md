@@ -1,6 +1,6 @@
 # Membership Feature Documentation
 
-**Last Updated:** November 1, 2025  
+**Last Updated:** November 7, 2025  
 **Status:** ✅ Production Ready
 
 ---
@@ -140,11 +140,14 @@ CREATE TABLE organization_join_requests (
    - Uses `is_org_member()` function
 
 5. **`Owners and Admins can update members`** (UPDATE)
-   - Can modify member roles
-   - Cannot remove Owner role (prevented by trigger)
+  - Can modify member roles
+  - Cannot update rows where current role is `Owner`
+  - Cannot change any row to `Owner` (use transfer ownership flow)
+  - Cannot modify own membership (no self-role changes)
 
 6. **`admins_can_update_members`** (UPDATE)
-   - Function-based update policy
+  - Function-based update policy
+  - Enforces: non-owner target, non-owner new role, and no self-modification
 
 7. **`Users can leave organizations`** (DELETE)
    - Members can remove themselves
@@ -251,6 +254,24 @@ Get memberships with optional filters.
 
 ---
 
+#### `GET /api/membership/organization/[organizationId]`
+Get organization members with pagination and optional role filter.
+
+**Query Parameters:**
+- `limit` (number): Page size (default 20, max 50)
+- `offset` (number): Starting index (default 0)
+- `role` (string, optional): Filter by role (`Owner` | `Admin` | `Attendance Taker` | `Member`)
+
+**Response:**
+```typescript
+{
+  members: Array<MembershipWithUser>,
+  total: number
+}
+```
+
+---
+
 #### `GET /api/membership/[id]`
 Get membership details by ID.
 
@@ -266,8 +287,8 @@ Get membership details by ID.
 
 ---
 
-#### `PUT /api/membership/[id]`
-Update member role (Owner/Admin only).
+#### `PATCH /api/membership/[id]`
+Update member role (Owner/Admin only; with restrictions).
 
 **Request Body:**
 ```typescript
@@ -284,9 +305,10 @@ Update member role (Owner/Admin only).
 ```
 
 **Restrictions:**
-- Cannot change Owner role (use transfer ownership instead)
 - Requester must be Owner or Admin
-- Cannot modify own Owner role
+- Cannot update a row where current role is `Owner`
+- Cannot change role to `Owner` (use transfer ownership instead)
+- Cannot modify own membership (no self-role changes)
 
 ---
 
@@ -711,10 +733,13 @@ export interface ReviewJoinRequestInput {
 - Conditional feature display based on role
 
 **Member List:**
-- Shows all organization members
+- Shows organization members with infinite scroll (defaults to 20 per page)
+- Server-side role filter; client-side search across loaded page
 - Role badges for each member
 - User details (name, email, user type)
 - Joined date
+- Per-card controls: Promote to Admin, Demote to Member, Remove
+- Controls visible to Owners/Admins; not shown on Owner rows; no self-modification
 
 ---
 
