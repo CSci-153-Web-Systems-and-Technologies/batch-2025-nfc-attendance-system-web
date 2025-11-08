@@ -130,15 +130,15 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Create New Event</h1>
-          <p className="text-sm text-gray-600">for {organizationName}</p>
+          <h1 className="text-2xl font-bold text-foreground">Create New Event</h1>
+          <p className="text-sm text-muted-foreground">for {organizationName}</p>
         </div>
       </div>
 
       {/* Form Card */}
-      <Card className="bg-white shadow-md">
+      <Card className="bg-card shadow-md">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-800">
+          <CardTitle className="text-lg font-semibold text-foreground">
             Event Details
           </CardTitle>
         </CardHeader>
@@ -146,7 +146,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Event Name */}
             <div className="space-y-2">
-              <Label htmlFor="event_name" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="event_name" className="text-sm font-medium text-foreground">
                 Event Name *
               </Label>
               <Input
@@ -161,14 +161,14 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 minLength={3}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.event_name.length}/200 characters
               </p>
             </div>
 
             {/* Date and Time */}
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="date" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Date and Time *
               </Label>
@@ -185,7 +185,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
 
             {/* Location */}
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="location" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
                 Location
               </Label>
@@ -199,14 +199,14 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 className="w-full"
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.location.length}/500 characters
               </p>
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="description" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Description
               </Label>
@@ -216,17 +216,17 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 value={formData.description}
                 onChange={handleInputChange}
                 placeholder="Provide more details about the event..."
-                className="w-full min-h-[120px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-y"
+                className="w-full min-h-[120px] px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-y"
                 maxLength={2000}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.description.length}/2000 characters
               </p>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-md text-sm">
                 {error}
               </div>
             )}
@@ -236,7 +236,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-6"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
               >
                 {loading ? (
                   <>
@@ -258,7 +258,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
             </div>
 
             {/* Required Field Note */}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               * Required fields
             </p>
           </form>
