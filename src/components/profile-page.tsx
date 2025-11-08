@@ -115,10 +115,10 @@ export function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-violet-50/30">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading profile...</p>
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading profile...</p>
         </div>
       </div>
     )
@@ -126,13 +126,13 @@ export function ProfilePage() {
 
   if (error || !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-violet-50/30">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <Card className="w-full max-w-md mx-4">
           <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardTitle className="text-destructive">Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 mb-4">
+            <p className="text-foreground mb-4">
               {error || 'Failed to load profile. Please complete your profile first.'}
             </p>
             <Button onClick={() => router.push('/complete-profile')} className="w-full">
@@ -148,11 +148,11 @@ export function ProfilePage() {
   const getUserTypeBadgeColor = (type: UserType) => {
     switch (type) {
       case 'Faculty':
-        return 'bg-blue-600'
+        return 'bg-accent'
       case 'Student':
-        return 'bg-emerald-600'
+        return 'bg-primary'
       default:
-        return 'bg-gray-600'
+        return 'bg-muted'
     }
   }
 
@@ -160,15 +160,15 @@ export function ProfilePage() {
   const getRoleBadgeColor = (role: OrganizationRole) => {
     switch (role) {
       case 'Owner':
-        return 'bg-violet-600'
+        return 'bg-primary'
       case 'Admin':
-        return 'bg-blue-600'
+        return 'bg-accent'
       case 'Attendance Taker':
-        return 'bg-cyan-600'
+        return 'bg-secondary'
       case 'Member':
-        return 'bg-gray-600'
+        return 'bg-muted'
       default:
-        return 'bg-gray-600'
+        return 'bg-muted'
     }
   }
 
@@ -234,8 +234,8 @@ export function ProfilePage() {
 
           <CardContent className="pt-6">
             {editError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{editError}</p>
+              <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{editError}</p>
               </div>
             )}
 
@@ -244,7 +244,7 @@ export function ProfilePage() {
               <div className="space-y-6">
                 {/* User Type Badge */}
                 <div>
-                  <Label className="text-gray-500 mb-2">User Type</Label>
+                  <Label className="text-muted-foreground mb-2">User Type</Label>
                   <div className="flex gap-2 mt-2">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white ${getUserTypeBadgeColor(
@@ -259,12 +259,12 @@ export function ProfilePage() {
                 {/* Organization Memberships */}
                 {!membershipsLoading && memberships.length > 0 && (
                   <div>
-                    <Label className="text-gray-500 mb-2">Organizations</Label>
+                    <Label className="text-muted-foreground mb-2">Organizations</Label>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {memberships.map((membership, index) => (
                         <span
                           key={index}
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white ${getRoleBadgeColor(
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-primary-foreground ${getRoleBadgeColor(
                             membership.role
                           )}`}
                         >
@@ -277,21 +277,21 @@ export function ProfilePage() {
 
                 {/* Email */}
                 <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-violet-600 mt-0.5" />
+                  <Mail className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <Label className="text-gray-500">Email Address</Label>
-                    <p className="text-gray-900 mt-1">{user.email}</p>
+                    <Label className="text-muted-foreground">Email Address</Label>
+                    <p className="text-foreground mt-1">{user.email}</p>
                   </div>
                 </div>
 
                 {/* NFC Tag ID */}
                 <div className="flex items-start gap-3">
-                  <CreditCard className="h-5 w-5 text-violet-600 mt-0.5" />
+                  <CreditCard className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <Label className="text-gray-500">NFC Tag ID</Label>
-                    <p className="text-gray-900 mt-1">
+                    <Label className="text-muted-foreground">NFC Tag ID</Label>
+                    <p className="text-foreground mt-1">
                       {user.nfc_tag_id || (
-                        <span className="text-gray-400 italic">Not set</span>
+                        <span className="text-muted-foreground italic">Not set</span>
                       )}
                     </p>
                   </div>
@@ -299,21 +299,21 @@ export function ProfilePage() {
 
                 {/* QR Code Data */}
                 <div className="flex items-start gap-3">
-                  <QrCode className="h-5 w-5 text-violet-600 mt-0.5" />
+                  <QrCode className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1">
-                    <Label className="text-gray-500">QR Code Data</Label>
-                    <p className="text-gray-900 mt-1 break-all">
+                    <Label className="text-muted-foreground">QR Code Data</Label>
+                    <p className="text-foreground mt-1 break-all">
                       {user.qr_code_data || (
-                        <span className="text-gray-400 italic">Not set</span>
+                        <span className="text-muted-foreground italic">Not set</span>
                       )}
                     </p>
                   </div>
                 </div>
 
                 {/* Account Created */}
-                <div className="pt-4 border-t border-gray-100">
-                  <Label className="text-gray-500">Member Since</Label>
-                  <p className="text-gray-900 mt-1">
+                <div className="pt-4 border-t border-border">
+                  <Label className="text-muted-foreground">Member Since</Label>
+                  <p className="text-foreground mt-1">
                     {new Date(user.created_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
