@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, Settings, User, LogIn, X, Building2 } from 'lucide-react'
 import { Button } from './button'
+import { ThemeToggle } from './theme-toggle'
 
 export function SidebarNav() {
   const [isOpen, setIsOpen] = useState(false)
@@ -31,15 +32,20 @@ export function SidebarNav() {
             </div>
           </div>
 
-          {/* Login / Sign Up Button */}
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              className="text-primary hover:bg-accent hover:text-accent-foreground text-sm font-medium"
-            >
-              Login / Sign Up
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+            
+            {/* Login / Sign Up Button */}
+            <Link href="/login">
+              <Button
+                variant="ghost"
+                className="text-primary hover:bg-accent hover:text-accent-foreground text-sm font-medium"
+              >
+                Login / Sign Up
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Mobile Dropdown Menu */}
@@ -116,6 +122,12 @@ export function SidebarNav() {
 
           {/* Bottom Navigation */}
           <div className="flex flex-col gap-2 px-2 pb-4">
+            {/* Theme Toggle */}
+            <div className={`flex items-center ${!isOpen ? 'justify-center px-2' : 'justify-start px-3 gap-3'}`}>
+              <ThemeToggle />
+              {isOpen && <span className="text-sm text-foreground">Theme</span>}
+            </div>
+
             {/* Login/Sign Up */}
             <Link href="/login">
               <Button
