@@ -72,6 +72,14 @@ export function SidebarNav() {
                   <span className="text-sm text-foreground">Settings</span>
                 </button>
               </Link>
+              
+              {/* Theme Toggle in Mobile Menu */}
+              <div className="border-t border-border mt-2 pt-2">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <ThemeToggle />
+                  <span className="text-sm text-foreground">Toggle Theme</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
