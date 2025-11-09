@@ -52,6 +52,12 @@ export function MembersView({
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const isInitialMount = useRef(true)
+  const [totalRoleCount, setTotalRoleCount] = useState(() => ({
+    All: initialTotal,
+    Owner: initialMembers.filter(m => m.role === 'Owner').length,
+    Admin: initialMembers.filter(m => m.role === 'Admin').length,
+    Member: initialMembers.filter(m => m.role === 'Member').length,
+  }))
 
   // Debug logging
   useEffect(() => {
@@ -78,8 +84,6 @@ export function MembersView({
         return <Crown className="w-4 h-4 text-amber-600" />
       case 'Admin':
         return <Shield className="w-4 h-4 text-purple-600" />
-      case 'Attendance Taker':
-        return <UserCheck className="w-4 h-4 text-blue-600" />
       case 'Member':
         return <User className="w-4 h-4 text-gray-600" />
     }
@@ -92,8 +96,6 @@ export function MembersView({
         return 'bg-amber-100 text-amber-800 border-amber-200'
       case 'Admin':
         return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'Attendance Taker':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'Member':
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -110,13 +112,7 @@ export function MembersView({
   }
 
   // Get member count by role
-  const roleCount = {
-    All: members.length,
-    Owner: members.filter(m => m.role === 'Owner').length,
-    Admin: members.filter(m => m.role === 'Admin').length,
-    'Attendance Taker': members.filter(m => m.role === 'Attendance Taker').length,
-    Member: members.filter(m => m.role === 'Member').length,
-  }
+  const roleCount = totalRoleCount
 
   // Fetch helpers
   const fetchMembers = async (opts: { reset?: boolean } = {}) => {
@@ -135,7 +131,18 @@ export function MembersView({
       setMembers((prev) => [...prev, ...newMembers])
       setOffset((prev) => prev + newMembers.length)
     }
-    if (typeof newTotal === 'number') setTotal(newTotal)
+    if (typeof newTotal === 'number') {
+      setTotal(newTotal)
+      // Update total role counts only when fetching all members
+      if (selectedRole === 'All') {
+        setTotalRoleCount({
+          All: newTotal,
+          Owner: newMembers.filter(m => m.role === 'Owner').length,
+          Admin: newMembers.filter(m => m.role === 'Admin').length,
+          Member: newMembers.filter(m => m.role === 'Member').length,
+        })
+      }
+    }
   }
 
   // Reset and refetch when role filter changes
@@ -184,6 +191,19 @@ export function MembersView({
       }
       const { membership } = await res.json()
       setMembers((prev) => prev.map((m) => (m.id === membership.id ? { ...m, role: membership.role } : m)))
+      
+      // Update total role counts
+      setTotalRoleCount((prev) => {
+        const oldMember = members.find(m => m.id === membershipId)
+        if (!oldMember) return prev
+        
+        const newCounts = { ...prev }
+        const oldRole = oldMember.role as keyof typeof prev
+        const newRole = role as keyof typeof prev
+        newCounts[oldRole] = Math.max(newCounts[oldRole] - 1, 0)
+        newCounts[newRole] = newCounts[newRole] + 1
+        return newCounts
+      })
     } catch (e) {
       console.error(e)
       alert((e as Error).message)
@@ -201,8 +221,20 @@ export function MembersView({
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || 'Failed to remove member')
       }
+      const memberToRemove = members.find(m => m.id === membershipId)
       setMembers((prev) => prev.filter((m) => m.id !== membershipId))
       setTotal((prev) => Math.max(prev - 1, 0))
+      
+      // Update total role counts
+      if (memberToRemove) {
+        setTotalRoleCount((prev) => {
+          const newCounts = { ...prev }
+          const role = memberToRemove.role as keyof typeof prev
+          newCounts[role] = Math.max(newCounts[role] - 1, 0)
+          newCounts.All = Math.max(newCounts.All - 1, 0)
+          return newCounts
+        })
+      }
     } catch (e) {
       console.error(e)
       alert((e as Error).message)
@@ -233,7 +265,7 @@ export function MembersView({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
@@ -264,16 +296,6 @@ export function MembersView({
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-200" onClick={() => setSelectedRole('Attendance Taker')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Takers</p>
-              <p className="text-2xl font-bold text-blue-600">{roleCount['Attendance Taker']}</p>
-            </div>
-            <UserCheck className="w-8 h-8 text-blue-600" />
-          </div>
-        </Card>
-
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-200" onClick={() => setSelectedRole('Member')}>
           <div className="flex items-center justify-between">
             <div>
@@ -299,7 +321,7 @@ export function MembersView({
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(['All', 'Owner', 'Admin', 'Attendance Taker', 'Member'] as const).map((role) => (
+            {(['All', 'Owner', 'Admin', 'Member'] as const).map((role) => (
               <Button
                 key={role}
                 variant={selectedRole === role ? 'default' : 'outline'}

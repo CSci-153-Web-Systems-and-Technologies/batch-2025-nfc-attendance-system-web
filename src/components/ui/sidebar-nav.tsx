@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, Settings, User, LogIn, X, Building2 } from 'lucide-react'
 import { Button } from './button'
+import { ThemeToggle } from './theme-toggle'
 
 export function SidebarNav() {
   const [isOpen, setIsOpen] = useState(false)
@@ -12,7 +13,7 @@ export function SidebarNav() {
   return (
     <>
       {/* Mobile Top Navigation - visible on small screens */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-violet-50 border-b border-violet-100">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             {/* Hamburger Menu */}
@@ -20,52 +21,65 @@ export function SidebarNav() {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="w-9 h-9 hover:bg-violet-100"
+              className="w-9 h-9 hover:bg-accent hover:text-accent-foreground"
             >
-              <Menu className="h-5 w-5 text-gray-700" />
+              <Menu className="h-5 w-5" />
             </Button>
 
             {/* User Icon */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+              <User className="h-4 w-4 text-primary-foreground" />
             </div>
           </div>
 
-          {/* Login / Sign Up Button */}
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              className="text-violet-600 hover:bg-violet-100 text-sm font-medium"
-            >
-              Login / Sign Up
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+            
+            {/* Login / Sign Up Button */}
+            <Link href="/login">
+              <Button
+                variant="ghost"
+                className="text-primary hover:bg-accent hover:text-accent-foreground text-sm font-medium"
+              >
+                Login / Sign Up
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Mobile Dropdown Menu */}
         {isMobileMenuOpen && (
-          <div className="absolute top-full left-4 mt-2 w-48 bg-white rounded-lg shadow-lg border border-violet-100 overflow-hidden">
+          <div className="absolute top-full left-4 mt-2 w-48 bg-card rounded-lg shadow-lg border border-border overflow-hidden">
             <div className="py-2">
               <Link href="/user" onClick={() => setIsMobileMenuOpen(false)}>
-                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary-foreground" />
                   </div>
-                  <span className="text-sm text-gray-700">User</span>
+                  <span className="text-sm text-foreground">User</span>
                 </button>
               </Link>
               <Link href="/organizations" onClick={() => setIsMobileMenuOpen(false)}>
-                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
-                  <Building2 className="h-5 w-5 text-violet-600" />
-                  <span className="text-sm text-gray-700">Organizations</span>
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <span className="text-sm text-foreground">Organizations</span>
                 </button>
               </Link>
               <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)}>
-                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors">
-                  <Settings className="h-5 w-5 text-violet-600" />
-                  <span className="text-sm text-gray-700">Settings</span>
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                  <Settings className="h-5 w-5 text-primary" />
+                  <span className="text-sm text-foreground">Settings</span>
                 </button>
               </Link>
+              
+              {/* Theme Toggle in Mobile Menu */}
+              <div className="border-t border-border mt-2 pt-2">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <ThemeToggle />
+                  <span className="text-sm text-foreground">Toggle Theme</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -81,7 +95,7 @@ export function SidebarNav() {
 
       {/* Desktop Sidebar - visible on medium screens and up */}
       <aside
-        className={`hidden md:block fixed left-0 top-0 h-full bg-violet-50 transition-all duration-300 z-50 ${
+        className={`hidden md:block fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50 ${
           isOpen ? 'w-48' : 'w-16'
         }`}
       >
@@ -91,9 +105,9 @@ export function SidebarNav() {
             variant="ghost"
             size="icon"
             onClick={() => setIsOpen(!isOpen)}
-            className="w-8 h-8 hover:bg-violet-100"
+            className="w-8 h-8 hover:bg-accent hover:text-accent-foreground"
           >
-            <Menu className="h-5 w-5 text-gray-700" />
+            <Menu className="h-5 w-5" />
           </Button>
         </div>
 
@@ -104,29 +118,35 @@ export function SidebarNav() {
             <Link href="/organizations">
               <Button
                 variant="ghost"
-                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                className={`w-full justify-start gap-3 hover:bg-accent hover:text-accent-foreground ${
                   !isOpen ? 'px-2' : 'px-3'
                 }`}
               >
-                <Building2 className="h-5 w-5 text-violet-600 shrink-0" />
-                {isOpen && <span className="text-sm text-gray-700">Organizations</span>}
+                <Building2 className="h-5 w-5 text-primary shrink-0" />
+                {isOpen && <span className="text-sm text-foreground">Organizations</span>}
               </Button>
             </Link>
           </div>
 
           {/* Bottom Navigation */}
           <div className="flex flex-col gap-2 px-2 pb-4">
+            {/* Theme Toggle */}
+            <div className={`flex items-center ${!isOpen ? 'justify-center px-2' : 'justify-start px-3 gap-3'}`}>
+              <ThemeToggle />
+              {isOpen && <span className="text-sm text-foreground">Theme</span>}
+            </div>
+
             {/* Login/Sign Up */}
             <Link href="/login">
               <Button
                 variant="ghost"
-                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                className={`w-full justify-start gap-3 hover:bg-accent hover:text-accent-foreground ${
                   !isOpen ? 'px-2' : 'px-3'
                 }`}
               >
-                <LogIn className="h-5 w-5 text-violet-600 shrink-0" />
+                <LogIn className="h-5 w-5 text-primary shrink-0" />
                 {isOpen && (
-                  <span className="text-sm text-gray-700">Login / Sign Up</span>
+                  <span className="text-sm text-foreground">Login / Sign Up</span>
                 )}
               </Button>
             </Link>
@@ -135,12 +155,12 @@ export function SidebarNav() {
             <Link href="/settings">
               <Button
                 variant="ghost"
-                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                className={`w-full justify-start gap-3 hover:bg-accent hover:text-accent-foreground ${
                   !isOpen ? 'px-2' : 'px-3'
                 }`}
               >
-                <Settings className="h-5 w-5 text-violet-600 shrink-0" />
-                {isOpen && <span className="text-sm text-gray-700">Settings</span>}
+                <Settings className="h-5 w-5 text-primary shrink-0" />
+                {isOpen && <span className="text-sm text-foreground">Settings</span>}
               </Button>
             </Link>
 
@@ -148,14 +168,14 @@ export function SidebarNav() {
             <Link href="/user">
               <Button
                 variant="ghost"
-                className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+                className={`w-full justify-start gap-3 hover:bg-accent hover:text-accent-foreground ${
                   !isOpen ? 'px-2' : 'px-3'
                 }`}
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shrink-0">
-                  <User className="h-4 w-4 text-white" />
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <User className="h-4 w-4 text-primary-foreground" />
                 </div>
-                {isOpen && <span className="text-sm text-gray-700">User</span>}
+                {isOpen && <span className="text-sm text-foreground">User</span>}
               </Button>
             </Link>
           </div>
