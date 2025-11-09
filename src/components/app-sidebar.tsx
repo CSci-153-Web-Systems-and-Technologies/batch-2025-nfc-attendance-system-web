@@ -18,6 +18,7 @@ import {
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/client'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 // Menu items
 const navigationItems = [
@@ -106,6 +107,16 @@ export function AppSidebar() {
                     <span>Settings</span>
                   </Link>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              {/* Theme Toggle */}
+              <SidebarMenuItem>
+                <div className="flex items-center gap-2 px-2 py-1.5">
+                  <ThemeToggle />
+                  {state === 'expanded' && (
+                    <span className="text-sm text-foreground">Theme</span>
+                  )}
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
