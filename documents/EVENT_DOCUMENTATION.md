@@ -1,6 +1,6 @@
 # Event Feature Documentation
 
-**Last Updated:** November 6, 2025  
+**Last Updated:** November 19, 2025  
 **Status:** ✅ Production Ready
 
 ---
@@ -24,7 +24,25 @@ The Event feature allows organizations to create and manage events within the NF
 - **Event**: A scheduled gathering or activity organized by an organization
 - **Event Creator**: The user who created the event
 - **Event Permissions**: Based on organization membership roles
-- **Attendance Tracking**: Events serve as the basis for tracking member attendance (via NFC/QR)
+- **Attendance Tracking**: Events support attendance tracking via NFC, QR, or manual methods (see ATTENDANCE_DOCUMENTATION.md)
+- **Real-time Updates**: Attendance can be tracked in real-time using Supabase Realtime
+
+---
+
+## 🆕 Attendance Features (November 19, 2025)
+
+Events now support comprehensive attendance tracking with multiple scan methods:
+
+- **NFC Scanning**: Android Chrome users can tap NFC tags for instant attendance
+- **QR Code Scanning**: Cross-platform QR code scanning via camera
+- **Manual Entry**: Fallback method for technical issues
+- **Real-time Updates**: See attendance updates live as people check in
+- **Geolocation**: Optional location tracking for verification
+- **Statistics**: Attendance rate, scan method breakdown, attendee lists
+
+**For detailed attendance documentation, see:**
+- [Attendance Documentation](./ATTENDANCE_DOCUMENTATION.md)
+- [Tag Management Documentation](./TAG_MANAGEMENT_DOCUMENTATION.md)
 
 ---
 
