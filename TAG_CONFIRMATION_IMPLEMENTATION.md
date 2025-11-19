@@ -99,12 +99,13 @@ Confirms successful NFC write (Phase 2).
 ## User Experience
 
 ### Success Flow
-1. User clicks "Program New Tag"
+1. User clicks "Program New Tag" (only available if cooldown elapsed or first-time user)
 2. UI shows "Tap NFC Tag Now..."
 3. User taps their NFC tag
 4. Tag is written successfully
 5. Database is updated
 6. UI shows success
+7. **Cooldown starts: User cannot write again for 14 days**
 
 ### Failure Flow
 1. User clicks "Program New Tag"
@@ -113,6 +114,22 @@ Confirms successful NFC write (Phase 2).
 4. Error message shown
 5. **Database remains unchanged** (no bad tag ID saved)
 6. Pending tag expires after 5 minutes
+7. **User can retry immediately** (cooldown not affected by failures)
+
+### Lost Card During Cooldown
+1. User loses their NFC card
+2. User tries to generate a new tag
+3. UI shows "New Tag Available in X Days"
+4. **User CANNOT write to a replacement card**
+5. **User must wait until cooldown ends**
+6. This is intentional for security and abuse prevention
+
+### First-Time User
+1. New user completes registration
+2. User has no tag_id in database
+3. "Program New Tag" button is ENABLED immediately
+4. User generates and writes their first tag
+5. Cooldown starts (14 days)
 
 ## Benefits
 

@@ -148,15 +148,6 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
     }
   };
 
-  const handleRetryWrite = async () => {
-    if (!currentTagId) return;
-    setError('');
-    const success = await writeToNfc(currentTagId);
-    if (success) {
-      // Maybe show a success toast?
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -216,7 +207,7 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
                 Active Tag Assigned
               </p>
               <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                Your tag is ready. If you lost it or it's broken, you can write the existing ID to a new tag below.
+                Your tag is ready for attendance check-in. You can rotate to a new ID in {daysRemaining} days.
               </p>
             </div>
           </div>
@@ -258,34 +249,10 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
             </Button>
           ) : (
             // Cooldown Active State
-            <div className="space-y-3">
-              <Button disabled className="w-full opacity-80" variant="secondary">
-                <Clock className="h-5 w-5 mr-2" />
-                New Tag Available in {daysRemaining} Days
-              </Button>
-              
-              {/* Allow writing EXISTING tag if cooldown is active (e.g. lost tag scenario) */}
-              {currentTagId && (
-                <Button 
-                  onClick={handleRetryWrite}
-                  disabled={isWriting}
-                  variant="outline" 
-                  className="w-full"
-                >
-                  {isWriting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Tap NFC Tag Now...
-                    </>
-                  ) : (
-                    <>
-                      <Smartphone className="h-4 w-4 mr-2" />
-                      Write Existing ID to Tag
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            <Button disabled className="w-full opacity-80" variant="secondary" size="lg">
+              <Clock className="h-5 w-5 mr-2" />
+              New Tag Available in {daysRemaining} Days
+            </Button>
           )}
         </div>
 
@@ -329,11 +296,16 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
         {/* Info */}
         <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
           <p>
-            • <strong>Program New Tag:</strong> Generates a new ID and writes it to your tag. Only available every {TAG_WRITE_COOLDOWN_DAYS} days.
+            • You can generate and write a new unique tag ID every {TAG_WRITE_COOLDOWN_DAYS} days.
           </p>
           <p>
-            • <strong>Write Existing ID:</strong> If you lost your tag but are in cooldown, use this to write your current ID to a replacement tag.
+            • Each tag write creates a completely new ID for security purposes.
           </p>
+          {!currentTagId && (
+            <p className="text-amber-600 dark:text-amber-400 font-medium">
+              • First-time setup: Generate your first tag to enable attendance check-in.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

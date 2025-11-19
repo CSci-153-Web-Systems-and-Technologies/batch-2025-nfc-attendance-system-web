@@ -170,25 +170,40 @@ AND written_at > NOW() - INTERVAL '1 hour';
 
 ---
 
-### Test 6: Write Existing ID to Tag (Lost Card Scenario)
+### Test 6: Lost Card Scenario During Cooldown
 
 **Steps:**
-1. User has an active tag_id in database
-2. User gets a new blank NFC card (simulated lost card)
-3. Click "Write Existing ID to Tag" button
-4. Tap new card with phone
-5. Try to use new card for attendance
+1. User successfully generates and writes a tag
+2. User "loses" their NFC card (remove it)
+3. User tries to generate a new tag within 14 days
+4. Observe the UI
 
 **Expected Results:**
-- ✅ Old tag_id is written to new card
-- ✅ No new entry in `user_tag_writes`
-- ✅ No cooldown triggered
-- ✅ New card works with existing tag_id
-- ✅ Database unchanged
+- ✅ Button shows "New Tag Available in X Days" and is disabled
+- ✅ User CANNOT write to a replacement card
+- ✅ User must wait until cooldown ends
+- ✅ No workaround or bypass available
+
+**Note:** This enforces strict security - lost cards during cooldown mean user cannot check in until cooldown ends or they find their original card.
 
 ---
 
-### Test 7: Attendance Scanning Still Works
+### Test 8: Attendance Scanning Still Works
+
+**Steps:**
+1. Create a new user account
+2. Complete profile setup
+3. Navigate to user profile/tag management
+4. Observe the UI
+
+**Expected Results:**
+- ✅ No tag_id in database (NULL)
+- ✅ "No Tag Assigned" warning shown
+- ✅ "Program New Tag" button is ENABLED (no cooldown for first-time)
+- ✅ User can immediately generate their first tag
+- ✅ After successful write, cooldown starts (14 days)
+
+---
 
 **Steps:**
 1. Generate a new tag using the new system
@@ -203,7 +218,7 @@ AND written_at > NOW() - INTERVAL '1 hour';
 
 ---
 
-### Test 8: Multiple Pending Tags Cleanup
+### Test 9: Multiple Pending Tags Cleanup
 
 **Steps:**
 1. Manually insert multiple pending records (for testing)

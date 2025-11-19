@@ -997,12 +997,13 @@ async function handleWriteToNFC(tagId: string) {
 
 1. **Two-Phase Commit:** Prevents database/NFC desynchronization on write failures
 2. **Pending Expiration:** Unconfirmed tags expire after 5 minutes
-3. **Cooldown Enforcement:** Prevents users from generating unlimited tags
+3. **Cooldown Enforcement:** Prevents users from generating unlimited tags - strictly enforced for ALL writes
 4. **Immutable History:** Tag writes cannot be deleted (audit trail)
 5. **Unique Tags:** Each tag_id is globally unique (UUID v4)
 6. **RLS Policies:** Users can only access their own tag data
 7. **No Tag Reuse:** Once confirmed, a tag_id is permanent until next rotation
 8. **Atomic Operations:** Tags are either fully written or not at all
+9. **No Bypass:** Users cannot write any tag (new or existing) during cooldown period
 
 ### Two-Phase Commit Security
 
@@ -1017,6 +1018,7 @@ async function handleWriteToNFC(tagId: string) {
 - Cannot confirm someone else's pending tag
 - Cannot reuse expired pending_id
 - All operations logged for audit
+- **No ability to write existing tag ID** - every write must generate new ID and respect cooldown
 
 ---
 

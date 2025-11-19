@@ -159,9 +159,11 @@ If someone cloned your card in Week 1:
 **A: No!** You use the same physical card forever. Only the ID stored on it changes.
 
 ### Q: What if I lose my card?
-**A: Two scenarios:**
-1. **Before 14 days**: Get a new blank card, use "Write Existing ID to Tag" to copy your current UUID to the new card
-2. **After 14 days**: Get a new blank card, use "Program New Tag" to generate a new UUID and write it to the new card
+**A: You have two options:**
+1. **Before 14 days have passed**: Unfortunately, you cannot write to a new card until the cooldown period ends. You'll need to wait until you can generate a new tag.
+2. **After 14 days**: Generate a new tag ID and write it to your new card.
+
+**Important:** There is no "write existing ID to replacement card" feature. This is intentional for security - it ensures that every tag write is tracked and subject to cooldown enforcement.
 
 ### Q: Can someone copy my card?
 **A: Yes, but it's useless after 14 days.** When you rotate to a new UUID, their copied card becomes invalid.
@@ -175,6 +177,7 @@ If someone cloned your card in Week 1:
 - Attendance records will show YOUR name
 - This defeats the purpose of attendance tracking
 - May violate your organization's policies
+- **Remember:** You cannot generate a new tag until 14 days pass, so losing access to your card means you cannot check in until cooldown ends
 
 ### Q: What happens to old UUIDs?
 **A: They're stored in history** (`user_tag_writes` table) but are no longer valid for attendance.
