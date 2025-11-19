@@ -49,6 +49,8 @@ export function TagWriter({ tagId }: TagWriterProps) {
           {
             recordType: NFC_RECORD_TYPE,
             data: tagId,
+            lang: 'en',
+            encoding: 'utf-8',
           },
         ],
       });
