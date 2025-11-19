@@ -4,17 +4,16 @@ import { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Copy, Check } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { QR_CODE_SIZE, QR_CODE_ERROR_CORRECTION } from '@/lib/constants';
 
 interface TagDisplayCardProps {
-  tagId: string;
+  tagId: string | null;
   userName: string;
 }
 
 export function TagDisplayCard({ tagId, userName }: TagDisplayCardProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -24,6 +23,7 @@ export function TagDisplayCard({ tagId, userName }: TagDisplayCardProps) {
   }, [tagId]);
 
   const generateQRCode = async () => {
+    if (!tagId) return;
     try {
       const dataUrl = await QRCode.toDataURL(tagId, {
         width: QR_CODE_SIZE,
@@ -64,16 +64,6 @@ export function TagDisplayCard({ tagId, userName }: TagDisplayCardProps) {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }, 'image/png');
-  };
-
-  const handleCopyTagId = async () => {
-    try {
-      await navigator.clipboard.writeText(tagId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
-    }
   };
 
   if (!tagId) {
