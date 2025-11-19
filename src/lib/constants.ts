@@ -66,7 +66,7 @@ export const QR_CODE_ERROR_CORRECTION: 'L' | 'M' | 'Q' | 'H' = 'M';
 /**
  * NFC NDEF record type for attendance tags
  */
-export const NFC_RECORD_TYPE = 'text/plain';
+export const NFC_RECORD_TYPE = 'text';
 
 /**
  * NFC tag timeout (in milliseconds)
