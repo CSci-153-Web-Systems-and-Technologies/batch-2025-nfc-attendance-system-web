@@ -1,6 +1,6 @@
 # User Feature Documentation
 
-**Last Updated:** November 1, 2025  
+**Last Updated:** November 19, 2025  
 **Status:** ✅ Production Ready
 
 ---
@@ -40,6 +40,7 @@ CREATE TABLE users (
   user_type text NOT NULL CHECK (user_type IN ('Student', 'Faculty')),
   auth_provider text NOT NULL DEFAULT 'email',
   has_password boolean NOT NULL DEFAULT true,
+    tag_id text UNIQUE,
   nfc_tag_id text UNIQUE,
   qr_code_data text UNIQUE,
   created_at timestamp with time zone DEFAULT now(),
@@ -54,6 +55,7 @@ CREATE TABLE users (
 - `user_type`: Type of user - 'Student' or 'Faculty'
 - `auth_provider`: Authentication provider (email, google, github, azure, facebook)
 - `has_password`: Whether user has a password set
+- `tag_id`: **NEW** Unified tag identifier for NFC and QR codes (unique, optional)
 - `nfc_tag_id`: NFC tag identifier (unique, optional)
 - `qr_code_data`: QR code data (unique, optional)
 - `created_at`: Timestamp when user profile created
@@ -61,13 +63,14 @@ CREATE TABLE users (
 
 **Constraints:**
 - `PRIMARY KEY`: id
-- `UNIQUE`: email, nfc_tag_id, qr_code_data
+- `UNIQUE`: email, tag_id, nfc_tag_id, qr_code_data
 - `CHECK`: user_type must be 'Student' or 'Faculty'
 - `NOT NULL`: id, name, email, user_type, auth_provider, has_password
 
 **Indexes:**
 - `users_pkey`: PRIMARY KEY on id
 - `users_email_key`: UNIQUE on email
+- `idx_users_tag_id`: On tag_id (for fast tag lookups)
 - `users_nfc_tag_id_key`: UNIQUE on nfc_tag_id
 - `users_qr_code_data_key`: UNIQUE on qr_code_data
 - `idx_users_email`: On email (for lookups)

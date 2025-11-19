@@ -502,6 +502,46 @@ FROM (organization_members om
     JOIN users u ON ((om.user_id = u.id)));
 */
 
+-- FUNCTION: confirm_tag_update
+-- Description: Updates tag ID and records write history if cooldown period has elapsed
+CREATE OR REPLACE FUNCTION confirm_tag_update(p_user_id UUID, p_tag_id TEXT)
+RETURNS JSON AS $$
+DECLARE
+    v_can_write_result JSON;
+    v_can_write BOOLEAN;
+    v_write_record_id UUID;
+BEGIN
+    -- Check if user can write a new tag
+    v_can_write_result := can_user_write_tag(p_user_id);
+    v_can_write := (v_can_write_result->>'can_write')::BOOLEAN;
+    
+    IF NOT v_can_write THEN
+        RAISE EXCEPTION 'Cannot write tag. Cooldown period not elapsed. Next available: %', 
+            v_can_write_result->>'next_available_date';
+    END IF;
+    
+    -- Update user's tag_id
+    UPDATE users 
+    SET tag_id = p_tag_id,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    -- Record the tag write in history
+    INSERT INTO user_tag_writes (user_id, tag_id, written_at)
+    VALUES (p_user_id, p_tag_id, NOW())
+    RETURNING id INTO v_write_record_id;
+    
+    RETURN json_build_object(
+        'success', TRUE,
+        'tag_id', p_tag_id,
+        'write_record_id', v_write_record_id,
+        'written_at', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION confirm_tag_update IS 'Updates tag ID and records write history if cooldown period has elapsed';
+
 -- ============================================================================
 -- SUMMARY
 -- ============================================================================
