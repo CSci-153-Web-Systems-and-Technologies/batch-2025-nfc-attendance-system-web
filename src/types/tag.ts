@@ -39,6 +39,17 @@ export interface GenerateTagResponse {
 }
 
 /**
+ * Response from prepare_tag function
+ * Returns a temporary tag ID that must be confirmed after NFC write
+ */
+export interface PrepareTagResponse {
+  success: boolean;
+  tag_id: string;
+  pending_id: string;
+  expires_at: string;
+}
+
+/**
  * Tag write history list response
  */
 export interface TagWriteHistory {
