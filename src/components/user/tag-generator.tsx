@@ -113,6 +113,10 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
       newTagId = prepareData.tag_id;
       pendingId = prepareData.pending_id;
 
+      if (!newTagId || !pendingId) {
+        throw new Error('Invalid response from server');
+      }
+
       // PHASE 2: Write to NFC
       setIsWriting(true);
       const writeSuccess = await writeToNfc(newTagId);
