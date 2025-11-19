@@ -16,7 +16,6 @@ import { useUserProfile } from '@/hooks/use-user-profile'
 import type { UserType } from '@/types/user'
 import type { OrganizationRole } from '@/types/organization'
 import { TagDisplayCard } from '@/components/user/tag-display-card'
-import { TagWriter } from '@/components/user/tag-writer'
 import { TagGenerator } from '@/components/user/tag-generator'
 
 interface UserMembership {
@@ -430,11 +429,6 @@ export function ProfilePage() {
             {/* Tag Display & Writer Column */}
             <div className="space-y-6">
               <TagDisplayCard
-                tagId={currentTagId}
-                userName={user.name}
-              />
-              
-              <TagWriter
                 tagId={currentTagId}
                 userName={user.name}
               />
