@@ -98,52 +98,53 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
 
     setIsGenerating(true);
     setError('');
+    
+    let pendingId: string | null = null;
+    let newTagId: string | null = null;
 
     try {
-      // 1. Generate new Tag ID
-      const response = await fetch('/api/user/tag/generate', { method: 'POST' });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate tag');
+      // PHASE 1: Prepare the tag (doesn't commit to database yet)
+      const prepareResponse = await fetch('/api/user/tag/prepare', { method: 'POST' });
+      if (!prepareResponse.ok) {
+        const errorData = await prepareResponse.json();
+        throw new Error(errorData.error || 'Failed to prepare tag');
       }
-      const data = await response.json();
-      const newTagId = data.tag_id;
+      const prepareData = await prepareResponse.json();
+      newTagId = prepareData.tag_id;
+      pendingId = prepareData.pending_id;
 
-      // 2. Write to NFC immediately
-      // We need to prompt user before writing because NDEFReader.write() requires user gesture?
-      // Actually, the button click IS the user gesture. But the write() promise resolves when tag is tapped.
-      // So we can chain it.
+      // PHASE 2: Write to NFC
+      setIsWriting(true);
+      const writeSuccess = await writeToNfc(newTagId);
       
-      // Note: We update the UI to show "Tap Tag" state
-      setIsWriting(true); // Show "Tap Tag" UI
-      
-      const success = await writeToNfc(newTagId);
-      
-      if (success) {
-        onTagGenerated(newTagId);
-        await Promise.all([checkEligibility(), fetchHistory()]);
-      } else {
-        // If write failed, the tag was still generated in DB.
-        // We should probably inform the user they can retry writing the *current* tag.
-        // But for now, just show the error.
-        onTagGenerated(newTagId); // Update UI with new ID anyway so they can retry writing it
+      if (!writeSuccess) {
+        // NFC write failed - the pending tag will expire in 5 minutes
+        // No database changes were made, so it's safe
+        throw new Error('Failed to write tag to NFC. The tag ID was not saved. Please try again.');
       }
 
+      // PHASE 3: Confirm the write (commits to database)
+      const confirmResponse = await fetch('/api/user/tag/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pending_id: pendingId }),
+      });
+
+      if (!confirmResponse.ok) {
+        const errorData = await confirmResponse.json();
+        throw new Error(errorData.error || 'Failed to confirm tag write');
+      }
+
+      // Success! Update UI
+      onTagGenerated(newTagId);
+      await Promise.all([checkEligibility(), fetchHistory()]);
+      
     } catch (error: any) {
-      console.error('Error generating tag:', error);
+      console.error('Error in tag generation flow:', error);
       setError(error.message || 'Failed to generate tag');
     } finally {
       setIsGenerating(false);
       setIsWriting(false);
-    }
-  };
-
-  const handleRetryWrite = async () => {
-    if (!currentTagId) return;
-    setError('');
-    const success = await writeToNfc(currentTagId);
-    if (success) {
-      // Maybe show a success toast?
     }
   };
 
@@ -206,7 +207,7 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
                 Active Tag Assigned
               </p>
               <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                Your tag is ready. If you lost it or it's broken, you can write the existing ID to a new tag below.
+                Your tag is ready for attendance check-in. You can rotate to a new ID in {daysRemaining} days.
               </p>
             </div>
           </div>
@@ -248,34 +249,10 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
             </Button>
           ) : (
             // Cooldown Active State
-            <div className="space-y-3">
-              <Button disabled className="w-full opacity-80" variant="secondary">
-                <Clock className="h-5 w-5 mr-2" />
-                New Tag Available in {daysRemaining} Days
-              </Button>
-              
-              {/* Allow writing EXISTING tag if cooldown is active (e.g. lost tag scenario) */}
-              {currentTagId && (
-                <Button 
-                  onClick={handleRetryWrite}
-                  disabled={isWriting}
-                  variant="outline" 
-                  className="w-full"
-                >
-                  {isWriting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Tap NFC Tag Now...
-                    </>
-                  ) : (
-                    <>
-                      <Smartphone className="h-4 w-4 mr-2" />
-                      Write Existing ID to Tag
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            <Button disabled className="w-full opacity-80" variant="secondary" size="lg">
+              <Clock className="h-5 w-5 mr-2" />
+              New Tag Available in {daysRemaining} Days
+            </Button>
           )}
         </div>
 
@@ -319,11 +296,16 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
         {/* Info */}
         <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
           <p>
-            • <strong>Program New Tag:</strong> Generates a new ID and writes it to your tag. Only available every {TAG_WRITE_COOLDOWN_DAYS} days.
+            • You can generate and write a new unique tag ID every {TAG_WRITE_COOLDOWN_DAYS} days.
           </p>
           <p>
-            • <strong>Write Existing ID:</strong> If you lost your tag but are in cooldown, use this to write your current ID to a replacement tag.
+            • Each tag write creates a completely new ID for security purposes.
           </p>
+          {!currentTagId && (
+            <p className="text-amber-600 dark:text-amber-400 font-medium">
+              • First-time setup: Generate your first tag to enable attendance check-in.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>
