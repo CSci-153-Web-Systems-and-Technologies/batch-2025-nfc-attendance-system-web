@@ -124,30 +124,15 @@ export function TagDisplayCard({ tagId, userName }: TagDisplayCardProps) {
               <Download className="h-4 w-4 mr-2" />
               Download PNG
             </Button>
-            <Button
-              onClick={handleCopyTagId}
-              variant="outline"
-              size="sm"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Tag ID
-                </>
-              )}
-            </Button>
           </div>
         </div>
 
         {/* Tag ID Display */}
         <div className="mt-4 p-3 bg-muted rounded-md">
           <p className="text-xs text-muted-foreground mb-1">Tag ID</p>
-          <p className="text-sm font-mono break-all">{tagId}</p>
+          <p className="text-sm font-mono break-all">
+            {tagId.substring(0, 8)}...{tagId.substring(tagId.length - 4)}
+          </p>
         </div>
 
         {/* Info */}
