@@ -67,7 +67,12 @@ export function TagGenerator({ currentTagId, onTagGenerated }: TagGeneratorProps
     try {
       const ndef = new (window as any).NDEFReader();
       await ndef.write({
-        records: [{ recordType: NFC_RECORD_TYPE, data: tagId }],
+        records: [
+          {
+            recordType: NFC_RECORD_TYPE,
+            data: tagId,
+          },
+        ],
       });
       return true;
     } catch (error: any) {
