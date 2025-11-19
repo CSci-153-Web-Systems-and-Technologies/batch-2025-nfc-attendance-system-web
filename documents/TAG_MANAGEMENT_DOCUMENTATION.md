@@ -329,6 +329,36 @@ Generate a new tag ID, assign to user, and record the write.
 
 ---
 
+### `confirm_tag_update(p_user_id UUID, p_tag_id TEXT)`
+
+Updates tag ID and records write history if cooldown period has elapsed.
+
+**Parameters:**
+- `p_user_id`: UUID of the user
+- `p_tag_id`: The new tag ID to assign
+
+**Returns:** JSON
+```json
+{
+  "success": boolean,
+  "tag_id": string,
+  "write_record_id": uuid,
+  "written_at": timestamp
+}
+```
+
+**Process:**
+1. Call `can_user_write_tag()` to check eligibility
+2. If cannot write, raise exception with next available date
+3. Update `users.tag_id` with provided `p_tag_id`
+4. Insert record into `user_tag_writes`
+5. Return success response
+
+**Errors:**
+- Raises exception if cooldown not elapsed
+
+---
+
 ### `get_tag_write_history(p_user_id UUID, p_limit INTEGER)`
 
 Get tag write history for a user.
