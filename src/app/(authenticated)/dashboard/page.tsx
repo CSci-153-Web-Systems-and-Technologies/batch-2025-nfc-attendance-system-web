@@ -166,7 +166,7 @@ export default function DashboardPage() {
             </Link>
 
             {/* Create Event Card */}
-            <Link href="/dashboard/create-event">
+            <Link href="/events/create">
               <div className="bg-card rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-border hover:border-primary/50 cursor-pointer group">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">

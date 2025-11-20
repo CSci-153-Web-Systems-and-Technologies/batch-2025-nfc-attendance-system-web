@@ -6,17 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Calendar, MapPin, FileText, ArrowLeft, Loader2 } from 'lucide-react'
+import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2 } from 'lucide-react'
+import type { OrganizationWithRole } from '@/types/organization'
 
 interface CreateEventFormProps {
-  organizationId: string
-  organizationName: string
+  organizationId?: string
+  organizationName?: string
+  organizations?: OrganizationWithRole[]
 }
 
-export function CreateEventForm({ organizationId, organizationName }: CreateEventFormProps) {
+export function CreateEventForm({ organizationId, organizationName, organizations }: CreateEventFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
 
   const [formData, setFormData] = useState({
     event_name: '',
@@ -34,6 +37,11 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
   }
 
   const validateForm = (): string | null => {
+    // Validate organization selection (only for global mode)
+    if (!organizationId && !selectedOrgId) {
+      return 'Please select an organization to publish the event to'
+    }
+
     // Validate event name (3-200 characters)
     if (!formData.event_name.trim()) {
       return 'Event name is required'
@@ -81,6 +89,9 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
     setLoading(true)
 
     try {
+      // Use organizationId from props if available (org-specific mode), otherwise use selected org (global mode)
+      const targetOrgId = organizationId || selectedOrgId
+
       const response = await fetch('/api/event', {
         method: 'POST',
         headers: {
@@ -89,7 +100,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
         body: JSON.stringify({
           event_name: formData.event_name,
           date: new Date(formData.date).toISOString(),
-          organization_id: organizationId,
+          organization_id: targetOrgId,
           location: formData.location || null,
           description: formData.description || null,
         }),
@@ -102,8 +113,13 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
 
       const data = await response.json()
       
-      // Redirect to events list or event detail page
-      router.push(`/organizations/${organizationId}/events`)
+      // Redirect to event detail page to confirm creation
+      if (data && data.id) {
+        router.push(`/organizations/${targetOrgId}/events/${data.id}`)
+      } else {
+        // Fallback to events list if no event ID returned
+        router.push(`/organizations/${targetOrgId}/events`)
+      }
       router.refresh()
     } catch (err) {
       console.error('Error creating event:', err)
@@ -114,7 +130,13 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
   }
 
   const handleCancel = () => {
-    router.push(`/organizations/${organizationId}/events`)
+    if (organizationId) {
+      // If in org-specific mode, go back to that org's events
+      router.push(`/organizations/${organizationId}/events`)
+    } else {
+      // If in global mode, go back to dashboard
+      router.push('/dashboard')
+    }
   }
 
   return (
@@ -131,7 +153,9 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Create New Event</h1>
-          <p className="text-sm text-muted-foreground">for {organizationName}</p>
+          {organizationName && (
+            <p className="text-sm text-muted-foreground">for {organizationName}</p>
+          )}
         </div>
       </div>
 
@@ -144,6 +168,43 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Organization Selector (only shown in global mode) */}
+            {!organizationId && (
+              <div className="space-y-2">
+                <Label htmlFor="organization" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Organization *
+                </Label>
+                {organizations && organizations.length > 0 ? (
+                  <select
+                    id="organization"
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                    value={selectedOrgId}
+                    onChange={(e) => {
+                      setSelectedOrgId(e.target.value)
+                      setError(null)
+                    }}
+                    disabled={loading}
+                    required
+                  >
+                    <option value="">Select an organization</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name} {org.tag ? `(${org.tag})` : ''} - {org.user_role}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground flex items-center">
+                    No organizations available to publish to
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Select the organization where you want to publish this event
+                </p>
+              </div>
+            )}
+
             {/* Event Name */}
             <div className="space-y-2">
               <Label htmlFor="event_name" className="text-sm font-medium text-foreground">
