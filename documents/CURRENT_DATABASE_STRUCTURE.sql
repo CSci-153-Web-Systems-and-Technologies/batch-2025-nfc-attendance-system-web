@@ -1,10 +1,49 @@
 -- ============================================================================
 -- CURRENT DATABASE STRUCTURE - EXPORT SNAPSHOT
 -- ============================================================================
--- Date: November 1, 2025 (Updated with join requests feature)
+-- Date: November 7, 2025 (Updated with member viewing and role management policies)
 -- Database: NFC Attendance System
 -- This file contains the complete current state of the database
--- Status: ✅ ACTIVE - Join Request System Implemented
+-- Status: ✅ ACTIVE - Join Request System + Member Management
+-- ============================================================================
+--
+-- REQUIRED SQL UPDATES:
+-- Run these commands in Supabase SQL Editor to enable members list view:
+--
+-- 1. Allow members to view other members in same organization:
+--    CREATE POLICY members_can_view_other_members
+--    ON organization_members FOR SELECT
+--    USING (is_org_member(organization_id, auth.uid()));
+--
+-- 2. Allow admins to update member roles (with restrictions):
+--    CREATE POLICY admins_can_update_members
+--    ON organization_members FOR UPDATE
+--    USING (
+--      is_org_admin(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    )
+--    WITH CHECK (
+--      is_org_admin(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    );
+--
+-- 3. Tighten owner update policy:
+--    DROP POLICY IF EXISTS update_members_by_owner ON organization_members;
+--    CREATE POLICY update_members_by_owner
+--    ON organization_members FOR UPDATE
+--    USING (
+--      is_org_owner(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    )
+--    WITH CHECK (
+--      is_org_owner(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    );
+--
 -- ============================================================================
 
 -- ============================================================================
@@ -230,7 +269,7 @@ users                     | TRUE
 -- ============================================================================
 -- RLS POLICIES (Security Rules) - UPDATED
 -- ============================================================================
--- Total Policies: 23
+-- Total Policies: 25
 -- Status: ✅ Active with Join Request System
 
 -- EVENTS TABLE POLICIES (6 policies)
@@ -256,14 +295,16 @@ users_can_delete_own_pending_requests            | DELETE    | Users can delete 
 users_can_view_own_requests                      | SELECT    | Users can view their own requests
 */
 
--- ORGANIZATION_MEMBERS TABLE POLICIES (4 policies)
+-- ORGANIZATION_MEMBERS TABLE POLICIES (6 policies)
 /*
 POLICY NAME                                      | OPERATION | DESCRIPTION
 -------------------------------------------------|-----------|--------------------------------------------------------
 delete_members                                   | DELETE    | Users can leave orgs, owners can remove members
 insert_members_by_owner_or_admin                 | INSERT    | Owners/Admins can add members
 select_own_memberships                           | SELECT    | Users can view their own memberships
-update_members_by_owner                          | UPDATE    | Owners can update member roles
+members_can_view_other_members                   | SELECT    | Members can view other members in same organization
+admins_can_update_members                        | UPDATE    | Admins can update member roles (non-owner, no self-modify)
+update_members_by_owner                          | UPDATE    | Owners can update member roles (non-owner, no self-modify)
 */
 
 -- ORGANIZATIONS TABLE POLICIES (4 policies)
@@ -460,6 +501,46 @@ SELECT om.id,
 FROM (organization_members om
     JOIN users u ON ((om.user_id = u.id)));
 */
+
+-- FUNCTION: confirm_tag_update
+-- Description: Updates tag ID and records write history if cooldown period has elapsed
+CREATE OR REPLACE FUNCTION confirm_tag_update(p_user_id UUID, p_tag_id TEXT)
+RETURNS JSON AS $$
+DECLARE
+    v_can_write_result JSON;
+    v_can_write BOOLEAN;
+    v_write_record_id UUID;
+BEGIN
+    -- Check if user can write a new tag
+    v_can_write_result := can_user_write_tag(p_user_id);
+    v_can_write := (v_can_write_result->>'can_write')::BOOLEAN;
+    
+    IF NOT v_can_write THEN
+        RAISE EXCEPTION 'Cannot write tag. Cooldown period not elapsed. Next available: %', 
+            v_can_write_result->>'next_available_date';
+    END IF;
+    
+    -- Update user's tag_id
+    UPDATE users 
+    SET tag_id = p_tag_id,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    -- Record the tag write in history
+    INSERT INTO user_tag_writes (user_id, tag_id, written_at)
+    VALUES (p_user_id, p_tag_id, NOW())
+    RETURNING id INTO v_write_record_id;
+    
+    RETURN json_build_object(
+        'success', TRUE,
+        'tag_id', p_tag_id,
+        'write_record_id', v_write_record_id,
+        'written_at', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION confirm_tag_update IS 'Updates tag ID and records write history if cooldown period has elapsed';
 
 -- ============================================================================
 -- SUMMARY

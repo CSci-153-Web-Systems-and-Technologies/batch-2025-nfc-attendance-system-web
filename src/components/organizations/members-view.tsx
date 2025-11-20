@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MembershipWithUser, MembershipRole } from '@/types/membership'
 import { Organization } from '@/types/organization'
@@ -24,16 +24,49 @@ import {
 
 interface MembersViewProps {
   organization: Organization
-  members: MembershipWithUser[]
+  initialMembers: MembershipWithUser[]
+  total: number
+  pageSize: number
+  organizationId: string
   currentUserRole: MembershipRole
+  currentUserId: string
 }
 
-export function MembersView({ organization, members, currentUserRole }: MembersViewProps) {
+export function MembersView({ 
+  organization, 
+  initialMembers, 
+  total: initialTotal,
+  pageSize,
+  organizationId,
+  currentUserRole,
+  currentUserId,
+}: MembersViewProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<MembershipRole | 'All'>('All')
+  const [members, setMembers] = useState<MembershipWithUser[]>(initialMembers)
+  const [total, setTotal] = useState<number>(initialTotal)
+  const [offset, setOffset] = useState<number>(initialMembers.length)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const isInitialMount = useRef(true)
+  const [totalRoleCount, setTotalRoleCount] = useState(() => ({
+    All: initialTotal,
+    Owner: initialMembers.filter(m => m.role === 'Owner').length,
+    Admin: initialMembers.filter(m => m.role === 'Admin').length,
+    Member: initialMembers.filter(m => m.role === 'Member').length,
+  }))
 
-  // Filter members based on search and role
+  // Debug logging
+  useEffect(() => {
+    console.log('MembersView - initialMembers:', initialMembers)
+    console.log('MembersView - total:', initialTotal)
+    console.log('MembersView - members state:', members)
+  }, [])
+
+  // Filter members based on search and role (search is client-side for now)
   const filteredMembers = members.filter((member) => {
     const matchesSearch = 
       member.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,8 +84,6 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
         return <Crown className="w-4 h-4 text-amber-600" />
       case 'Admin':
         return <Shield className="w-4 h-4 text-purple-600" />
-      case 'Attendance Taker':
-        return <UserCheck className="w-4 h-4 text-blue-600" />
       case 'Member':
         return <User className="w-4 h-4 text-gray-600" />
     }
@@ -65,8 +96,6 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
         return 'bg-amber-100 text-amber-800 border-amber-200'
       case 'Admin':
         return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'Attendance Taker':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'Member':
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -75,13 +104,143 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
   // Check if current user can manage members
   const canManageMembers = currentUserRole === 'Owner' || currentUserRole === 'Admin'
 
+  const canManageTarget = (m: MembershipWithUser) => {
+    // Cannot manage owners, and cannot manage own membership
+    if (m.role === 'Owner') return false
+    if (m.user.id === currentUserId) return false
+    return canManageMembers
+  }
+
   // Get member count by role
-  const roleCount = {
-    All: members.length,
-    Owner: members.filter(m => m.role === 'Owner').length,
-    Admin: members.filter(m => m.role === 'Admin').length,
-    'Attendance Taker': members.filter(m => m.role === 'Attendance Taker').length,
-    Member: members.filter(m => m.role === 'Member').length,
+  const roleCount = totalRoleCount
+
+  // Fetch helpers
+  const fetchMembers = async (opts: { reset?: boolean } = {}) => {
+    const effectiveOffset = opts.reset ? 0 : offset
+    const roleParam = selectedRole !== 'All' ? `&role=${encodeURIComponent(selectedRole)}` : ''
+    const res = await fetch(`/api/membership/organization/${organizationId}?limit=${pageSize}&offset=${effectiveOffset}${roleParam}`)
+    if (!res.ok) return
+    const json = await res.json()
+    const newMembers: MembershipWithUser[] = json.members || []
+    const newTotal: number | undefined = json.total
+
+    if (opts.reset) {
+      setMembers(newMembers)
+      setOffset(newMembers.length)
+    } else {
+      setMembers((prev) => [...prev, ...newMembers])
+      setOffset((prev) => prev + newMembers.length)
+    }
+    if (typeof newTotal === 'number') {
+      setTotal(newTotal)
+      // Update total role counts only when fetching all members
+      if (selectedRole === 'All') {
+        setTotalRoleCount({
+          All: newTotal,
+          Owner: newMembers.filter(m => m.role === 'Owner').length,
+          Admin: newMembers.filter(m => m.role === 'Admin').length,
+          Member: newMembers.filter(m => m.role === 'Member').length,
+        })
+      }
+    }
+  }
+
+  // Reset and refetch when role filter changes
+  useEffect(() => {
+    // Skip on initial mount - use server-side data
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    
+    // For server-side role filter; search stays client-side
+    setIsRefreshing(true)
+    fetchMembers({ reset: true }).finally(() => setIsRefreshing(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole, organizationId])
+
+  // Infinite scroll
+  useEffect(() => {
+    if (!loadMoreRef.current) return
+    const el = loadMoreRef.current
+    const observer = new IntersectionObserver((entries) => {
+      const first = entries[0]
+      if (first.isIntersecting && !isLoadingMore && members.length < total) {
+        setIsLoadingMore(true)
+        fetchMembers().finally(() => setIsLoadingMore(false))
+      }
+    }, { rootMargin: '200px' })
+
+    observer.observe(el)
+    return () => observer.unobserve(el)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members.length, total, isLoadingMore, selectedRole, organizationId])
+
+  // Actions
+  const updateRole = async (membershipId: string, role: MembershipRole) => {
+    try {
+      setActionLoadingId(membershipId)
+      const res = await fetch(`/api/membership/${membershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update role')
+      }
+      const { membership } = await res.json()
+      setMembers((prev) => prev.map((m) => (m.id === membership.id ? { ...m, role: membership.role } : m)))
+      
+      // Update total role counts
+      setTotalRoleCount((prev) => {
+        const oldMember = members.find(m => m.id === membershipId)
+        if (!oldMember) return prev
+        
+        const newCounts = { ...prev }
+        const oldRole = oldMember.role as keyof typeof prev
+        const newRole = role as keyof typeof prev
+        newCounts[oldRole] = Math.max(newCounts[oldRole] - 1, 0)
+        newCounts[newRole] = newCounts[newRole] + 1
+        return newCounts
+      })
+    } catch (e) {
+      console.error(e)
+      alert((e as Error).message)
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const removeMember = async (membershipId: string) => {
+    try {
+      if (!confirm('Remove this member from the organization?')) return
+      setActionLoadingId(membershipId)
+      const res = await fetch(`/api/membership/${membershipId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to remove member')
+      }
+      const memberToRemove = members.find(m => m.id === membershipId)
+      setMembers((prev) => prev.filter((m) => m.id !== membershipId))
+      setTotal((prev) => Math.max(prev - 1, 0))
+      
+      // Update total role counts
+      if (memberToRemove) {
+        setTotalRoleCount((prev) => {
+          const newCounts = { ...prev }
+          const role = memberToRemove.role as keyof typeof prev
+          newCounts[role] = Math.max(newCounts[role] - 1, 0)
+          newCounts.All = Math.max(newCounts.All - 1, 0)
+          return newCounts
+        })
+      }
+    } catch (e) {
+      console.error(e)
+      alert((e as Error).message)
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   return (
@@ -106,7 +265,7 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
@@ -137,16 +296,6 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-200" onClick={() => setSelectedRole('Attendance Taker')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Takers</p>
-              <p className="text-2xl font-bold text-blue-600">{roleCount['Attendance Taker']}</p>
-            </div>
-            <UserCheck className="w-8 h-8 text-blue-600" />
-          </div>
-        </Card>
-
         <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-200" onClick={() => setSelectedRole('Member')}>
           <div className="flex items-center justify-between">
             <div>
@@ -172,7 +321,7 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(['All', 'Owner', 'Admin', 'Attendance Taker', 'Member'] as const).map((role) => (
+            {(['All', 'Owner', 'Admin', 'Member'] as const).map((role) => (
               <Button
                 key={role}
                 variant={selectedRole === role ? 'default' : 'outline'}
@@ -187,7 +336,12 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
       </Card>
 
       {/* Members List */}
-      {filteredMembers.length === 0 ? (
+      {isRefreshing ? (
+        <Card className="p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading members...</p>
+        </Card>
+      ) : filteredMembers.length === 0 ? (
         <Card className="p-12 text-center">
           <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No members found</h3>
@@ -195,6 +349,9 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
             {searchQuery || selectedRole !== 'All'
               ? 'Try adjusting your search or filter criteria.'
               : 'This organization has no members yet.'}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Debug: Total={total}, Members={members.length}, InitialMembers={initialMembers.length}
           </p>
         </Card>
       ) : (
@@ -248,26 +405,58 @@ export function MembersView({ organization, members, currentUserRole }: MembersV
                 </div>
 
                 {/* Actions */}
-                {canManageMembers && member.role !== 'Owner' && (
+                {canManageTarget(member) && (
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <UserCog className="w-4 h-4" />
-                      Manage
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                    {member.role !== 'Admin' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        disabled={actionLoadingId === member.id}
+                        onClick={() => updateRole(member.id, 'Admin')}
+                      >
+                        <UserCog className="w-4 h-4" />
+                        Promote to Admin
+                      </Button>
+                    )}
+                    {member.role === 'Admin' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        disabled={actionLoadingId === member.id}
+                        onClick={() => updateRole(member.id, 'Member')}
+                      >
+                        <UserCog className="w-4 h-4" />
+                        Demote to Member
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={actionLoadingId === member.id}
+                      onClick={() => removeMember(member.id)}
+                    >
                       <Trash2 className="w-4 h-4" />
+                      Remove
                     </Button>
                   </div>
                 )}
               </div>
             </Card>
           ))}
+          {/* Sentinel for infinite scroll */}
+          <div ref={loadMoreRef} />
+          {isLoadingMore && (
+            <Card className="p-4 text-center text-sm text-gray-600">Loading more...</Card>
+          )}
         </div>
       )}
 
       {/* Footer Info */}
       <div className="mt-8 text-center text-sm text-gray-600">
-        Showing {filteredMembers.length} of {members.length} members
+        Showing {filteredMembers.length} of {total} members
       </div>
     </div>
   )
