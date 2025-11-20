@@ -12,13 +12,17 @@ import {
   ArrowLeft,
   Clock,
   FileText,
+  Timer,
 } from 'lucide-react'
 import { MembershipRole } from '@/types/membership'
+import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
 
 interface Event {
   id: string
   event_name: string
   date: string
+  event_start?: string | null
+  event_end?: string | null
   location: string | null
   description: string | null
   created_by: string
@@ -43,20 +47,14 @@ export function EventsListView({
   events,
 }: EventsListViewProps) {
   const router = useRouter()
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all')
+  const [filter, setFilter] = useState<'all' | 'ongoing' | 'upcoming' | 'past'>('all')
 
   const canCreateEvents = ['Owner', 'Admin', 'Attendance Taker'].includes(userRole)
 
-  const now = new Date()
-
   const filteredEvents = events.filter((event) => {
-    const eventDate = new Date(event.date)
-    if (filter === 'upcoming') {
-      return eventDate > now
-    } else if (filter === 'past') {
-      return eventDate <= now
-    }
-    return true
+    if (filter === 'all') return true
+    const status = getEventStatus(event)
+    return status === filter
   })
 
   const formatDate = (dateString: string) => {
@@ -95,15 +93,15 @@ export function EventsListView({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Events</h1>
-            <p className="text-sm text-gray-600">{organizationName}</p>
+            <h1 className="text-2xl font-bold text-foreground">Events</h1>
+            <p className="text-sm text-muted-foreground">{organizationName}</p>
           </div>
         </div>
 
         {canCreateEvents && (
           <Button
             onClick={() => router.push(`/organizations/${organizationId}/events/create`)}
-            className="bg-violet-600 hover:bg-violet-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Event
@@ -112,25 +110,35 @@ export function EventsListView({
       </div>
 
       {/* Filters */}
-      <Card className="bg-white shadow-md">
+      <Card className="bg-card shadow-md">
         <CardContent className="pt-6">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === 'all'
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-accent'
               }`}
             >
               All Events
             </button>
             <button
+              onClick={() => setFilter('ongoing')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'ongoing'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-accent'
+              }`}
+            >
+              Currently Happening
+            </button>
+            <button
               onClick={() => setFilter('upcoming')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === 'upcoming'
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-accent'
               }`}
             >
               Upcoming
@@ -139,8 +147,8 @@ export function EventsListView({
               onClick={() => setFilter('past')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === 'past'
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-accent'
               }`}
             >
               Past
@@ -151,15 +159,17 @@ export function EventsListView({
 
       {/* Events List */}
       {filteredEvents.length === 0 ? (
-        <Card className="bg-white shadow-md">
+        <Card className="bg-card shadow-md">
           <CardContent className="py-12">
             <div className="text-center">
-              <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">
+              <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 No events found
               </h3>
-              <p className="text-gray-600 mb-6">
-                {filter === 'upcoming'
+              <p className="text-muted-foreground mb-6">
+                {filter === 'ongoing'
+                  ? 'No events currently happening.'
+                  : filter === 'upcoming'
                   ? 'No upcoming events scheduled.'
                   : filter === 'past'
                   ? 'No past events.'
@@ -170,7 +180,7 @@ export function EventsListView({
                   onClick={() =>
                     router.push(`/organizations/${organizationId}/events/create`)
                   }
-                  className="bg-violet-600 hover:bg-violet-700 text-white"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Event
@@ -181,11 +191,15 @@ export function EventsListView({
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredEvents.map((event) => (
+          {filteredEvents.map((event) => {
+            const eventStatus = getEventStatus(event)
+            const hasAttendanceWindow = event.event_start && event.event_end
+            
+            return (
             <Card
               key={event.id}
-              className={`bg-white shadow-md hover:shadow-lg transition-shadow cursor-pointer ${
-                isUpcoming(event.date) ? 'border-l-4 border-l-violet-500' : ''
+              className={`bg-card shadow-md hover:shadow-lg transition-shadow cursor-pointer ${
+                eventStatus === 'ongoing' ? 'border-l-4 border-l-green-500' : eventStatus === 'upcoming' ? 'border-l-4 border-l-primary' : ''
               }`}
               onClick={() => router.push(`/organizations/${organizationId}/events/${event.id}`)}
             >
@@ -195,68 +209,85 @@ export function EventsListView({
                   <div className="flex-1 space-y-3">
                     {/* Event Name & Status Badge */}
                     <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-800">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {event.event_name}
                       </h3>
-                      {isUpcoming(event.date) ? (
+                      {eventStatus === 'ongoing' && (
                         <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                          Currently Happening
+                        </span>
+                      )}
+                      {eventStatus === 'upcoming' && (
+                        <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
                           Upcoming
                         </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">
+                      )}
+                      {eventStatus === 'past' && (
+                        <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-semibold rounded-full">
                           Past
                         </span>
                       )}
                     </div>
 
                     {/* Date and Time */}
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-violet-600" />
-                        <span>{formatDate(event.date)}</span>
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <span>{formatEventDate(event.date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-violet-600" />
-                        <span>{formatTime(event.date)}</span>
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span>{formatEventTime(event.date)}</span>
                       </div>
                     </div>
 
+                    {/* Attendance Window */}
+                    {hasAttendanceWindow && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-accent/50 p-2 rounded-md">
+                        <Timer className="h-4 w-4 text-primary" />
+                        <span>
+                          Attendance: {formatEventTime(event.event_start!)} - {formatEventTime(event.event_end!)}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Location */}
                     {event.location && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 text-violet-600" />
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>{event.location}</span>
                       </div>
                     )}
 
                     {/* Description Preview */}
                     {event.description && (
-                      <div className="flex items-start gap-2 text-sm text-gray-600">
-                        <FileText className="h-4 w-4 text-violet-600 mt-0.5" />
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <FileText className="h-4 w-4 text-primary mt-0.5" />
                         <p className="line-clamp-2">{event.description}</p>
                       </div>
                     )}
 
                     {/* Creator */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                       <User className="h-3 w-3" />
                       <span>Created by {event.users.name}</span>
                     </div>
                   </div>
 
                   {/* Date Badge */}
-                  <div className="flex flex-col items-center justify-center bg-violet-50 rounded-lg p-3 min-w-[70px]">
-                    <span className="text-2xl font-bold text-violet-600">
+                  <div className="flex flex-col items-center justify-center bg-primary/10 rounded-lg p-3 min-w-[70px]">
+                    <span className="text-2xl font-bold text-primary">
                       {new Date(event.date).getDate()}
                     </span>
-                    <span className="text-xs font-medium text-violet-600 uppercase">
+                    <span className="text-xs font-medium text-primary uppercase">
                       {new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )
+          })}
         </div>
       )}
     </div>

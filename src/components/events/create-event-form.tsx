@@ -6,24 +6,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Calendar, MapPin, FileText, ArrowLeft, Loader2 } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
+import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2, Clock } from 'lucide-react'
+import type { OrganizationWithRole } from '@/types/organization'
 
 interface CreateEventFormProps {
-  organizationId: string
-  organizationName: string
+  organizationId?: string
+  organizationName?: string
+  organizations?: OrganizationWithRole[]
 }
 
-export function CreateEventForm({ organizationId, organizationName }: CreateEventFormProps) {
+export function CreateEventForm({ organizationId, organizationName, organizations }: CreateEventFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
 
   const [formData, setFormData] = useState({
     event_name: '',
-    date: '',
     location: '',
     description: '',
   })
+  
+  const [eventDate, setEventDate] = useState<Date | undefined>(undefined)
+  const [eventEnd, setEventEnd] = useState<Date | undefined>(undefined)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -34,6 +40,11 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
   }
 
   const validateForm = (): string | null => {
+    // Validate organization selection (only for global mode)
+    if (!organizationId && !selectedOrgId) {
+      return 'Please select an organization to publish the event to'
+    }
+
     // Validate event name (3-200 characters)
     if (!formData.event_name.trim()) {
       return 'Event name is required'
@@ -46,12 +57,18 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
     }
 
     // Validate date
-    if (!formData.date) {
+    if (!eventDate) {
       return 'Event date and time is required'
     }
-    const eventDate = new Date(formData.date)
     if (isNaN(eventDate.getTime())) {
       return 'Invalid date format'
+    }
+
+    // Validate that event_end is after event date if provided
+    if (eventEnd) {
+      if (eventDate >= eventEnd) {
+        return 'Event End must be after Event Date and Time'
+      }
     }
 
     // Validate location (max 500 characters)
@@ -81,18 +98,29 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
     setLoading(true)
 
     try {
+      // Use organizationId from props if available (org-specific mode), otherwise use selected org (global mode)
+      const targetOrgId = organizationId || selectedOrgId
+
+      const requestBody: any = {
+        event_name: formData.event_name,
+        date: eventDate!.toISOString(),
+        organization_id: targetOrgId,
+        location: formData.location || null,
+        description: formData.description || null,
+      }
+
+      // If event_end is provided, use eventDate as event_start
+      if (eventEnd) {
+        requestBody.event_start = eventDate!.toISOString()
+        requestBody.event_end = eventEnd.toISOString()
+      }
+
       const response = await fetch('/api/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          event_name: formData.event_name,
-          date: new Date(formData.date).toISOString(),
-          organization_id: organizationId,
-          location: formData.location || null,
-          description: formData.description || null,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -102,8 +130,13 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
 
       const data = await response.json()
       
-      // Redirect to events list or event detail page
-      router.push(`/organizations/${organizationId}/events`)
+      // Redirect to event detail page to confirm creation
+      if (data && data.id) {
+        router.push(`/organizations/${targetOrgId}/events/${data.id}`)
+      } else {
+        // Fallback to events list if no event ID returned
+        router.push(`/organizations/${targetOrgId}/events`)
+      }
       router.refresh()
     } catch (err) {
       console.error('Error creating event:', err)
@@ -114,7 +147,13 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
   }
 
   const handleCancel = () => {
-    router.push(`/organizations/${organizationId}/events`)
+    if (organizationId) {
+      // If in org-specific mode, go back to that org's events
+      router.push(`/organizations/${organizationId}/events`)
+    } else {
+      // If in global mode, go back to dashboard
+      router.push('/dashboard')
+    }
   }
 
   return (
@@ -130,23 +169,62 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Create New Event</h1>
-          <p className="text-sm text-gray-600">for {organizationName}</p>
+          <h1 className="text-2xl font-bold text-foreground">Create New Event</h1>
+          {organizationName && (
+            <p className="text-sm text-muted-foreground">for {organizationName}</p>
+          )}
         </div>
       </div>
 
       {/* Form Card */}
-      <Card className="bg-white shadow-md">
+      <Card className="bg-card shadow-md">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-800">
+          <CardTitle className="text-lg font-semibold text-foreground">
             Event Details
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Organization Selector (only shown in global mode) */}
+            {!organizationId && (
+              <div className="space-y-2">
+                <Label htmlFor="organization" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Organization *
+                </Label>
+                {organizations && organizations.length > 0 ? (
+                  <select
+                    id="organization"
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                    value={selectedOrgId}
+                    onChange={(e) => {
+                      setSelectedOrgId(e.target.value)
+                      setError(null)
+                    }}
+                    disabled={loading}
+                    required
+                  >
+                    <option value="">Select an organization</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name} {org.tag ? `(${org.tag})` : ''} - {org.user_role}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground flex items-center">
+                    No organizations available to publish to
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Select the organization where you want to publish this event
+                </p>
+              </div>
+            )}
+
             {/* Event Name */}
             <div className="space-y-2">
-              <Label htmlFor="event_name" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="event_name" className="text-sm font-medium text-foreground">
                 Event Name *
               </Label>
               <Input
@@ -161,31 +239,58 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 minLength={3}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.event_name.length}/200 characters
               </p>
             </div>
 
             {/* Date and Time */}
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="date" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Date and Time *
+                Event Date and Time *
               </Label>
-              <Input
-                id="date"
-                name="date"
-                type="datetime-local"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full"
-                required
+              <DateTimePicker
+                date={eventDate}
+                setDate={setEventDate}
+                placeholder="Pick event date and time"
+                disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                When the event starts (also when attendance tracking begins)
+              </p>
             </div>
+
+            {/* Event End (Attendance Window End) */}
+            <div className="space-y-2">
+              <Label htmlFor="event_end" className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Event End (Optional)
+              </Label>
+              <DateTimePicker
+                date={eventEnd}
+                setDate={setEventEnd}
+                placeholder="When does attendance close?"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                When attendance tracking ends
+              </p>
+            </div>
+
+            {/* Attendance Window Helper Text */}
+            {eventEnd && (
+              <div className="bg-muted/50 border border-border rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong>ℹ️ Attendance Window:</strong> Attendance can be taken from the Event Date and Time until the Event End. 
+                  Leave Event End blank if this is a reminder-only event with no attendance tracking.
+                </p>
+              </div>
+            )}
 
             {/* Location */}
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="location" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
                 Location
               </Label>
@@ -199,14 +304,14 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 className="w-full"
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.location.length}/500 characters
               </p>
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Label htmlFor="description" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Description
               </Label>
@@ -216,17 +321,17 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
                 value={formData.description}
                 onChange={handleInputChange}
                 placeholder="Provide more details about the event..."
-                className="w-full min-h-[120px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-y"
+                className="w-full min-h-[120px] px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-y"
                 maxLength={2000}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {formData.description.length}/2000 characters
               </p>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-md text-sm">
                 {error}
               </div>
             )}
@@ -236,7 +341,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-6"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
               >
                 {loading ? (
                   <>
@@ -258,7 +363,7 @@ export function CreateEventForm({ organizationId, organizationName }: CreateEven
             </div>
 
             {/* Required Field Note */}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               * Required fields
             </p>
           </form>

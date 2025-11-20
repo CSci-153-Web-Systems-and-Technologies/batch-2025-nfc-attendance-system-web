@@ -1,6 +1,6 @@
 # Event Feature Documentation
 
-**Last Updated:** November 6, 2025  
+**Last Updated:** November 19, 2025  
 **Status:** ✅ Production Ready
 
 ---
@@ -24,7 +24,25 @@ The Event feature allows organizations to create and manage events within the NF
 - **Event**: A scheduled gathering or activity organized by an organization
 - **Event Creator**: The user who created the event
 - **Event Permissions**: Based on organization membership roles
-- **Attendance Tracking**: Events serve as the basis for tracking member attendance (via NFC/QR)
+- **Attendance Tracking**: Events support attendance tracking via NFC, QR, or manual methods (see ATTENDANCE_DOCUMENTATION.md)
+- **Real-time Updates**: Attendance can be tracked in real-time using Supabase Realtime
+
+---
+
+## 🆕 Attendance Features (November 19, 2025)
+
+Events now support comprehensive attendance tracking with multiple scan methods:
+
+- **NFC Scanning**: Android Chrome users can tap NFC tags for instant attendance
+- **QR Code Scanning**: Cross-platform QR code scanning via camera
+- **Manual Entry**: Fallback method for technical issues
+- **Real-time Updates**: See attendance updates live as people check in
+- **Geolocation**: Optional location tracking for verification
+- **Statistics**: Attendance rate, scan method breakdown, attendee lists
+
+**For detailed attendance documentation, see:**
+- [Attendance Documentation](./ATTENDANCE_DOCUMENTATION.md)
+- [Tag Management Documentation](./TAG_MANAGEMENT_DOCUMENTATION.md)
 
 ---
 
@@ -42,7 +60,9 @@ CREATE TABLE events (
   location text,
   created_by uuid NOT NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
-  updated_at timestamp with time zone DEFAULT now() NOT NULL
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  event_start timestamp with time zone,
+  event_end timestamp with time zone
 );
 ```
 
@@ -56,6 +76,18 @@ CREATE TABLE events (
 - `created_by`: Reference to the user who created the event (required)
 - `created_at`: Timestamp when event was created (auto-generated)
 - `updated_at`: Timestamp when event was last updated (auto-updated via trigger)
+- `event_start`: Start of attendance window - when attendance tracking begins (optional, added Nov 20, 2025)
+- `event_end`: End of attendance window - when attendance tracking closes (optional, added Nov 20, 2025)
+
+**Attendance Window Fields (Added Nov 20, 2025):**
+- `event_start` and `event_end` are optional (nullable) fields that define when attendance can be taken
+- When both are `NULL`, the event is a **reminder-only event** with no attendance tracking
+- When set, attendance can **only be marked** between `event_start` and `event_end`
+- The `date` field remains as the event's scheduled date/time
+- Validation ensures `event_start` < `event_end` when both are provided
+- Both fields must be set together, or both left empty
+- Stored as ISO 8601 UTC timestamps in the database
+- Displayed in user's local timezone in the UI
 
 **Constraints:**
 - `PRIMARY KEY`: id
@@ -77,8 +109,10 @@ CREATE TABLE events (
 - `idx_events_name`: On event_name (for search functionality)
 - `idx_events_org_date`: Composite on (organization_id, date DESC) (optimized for org event lists)
 - `idx_events_name_lower`: On LOWER(event_name) (case-insensitive search, added Nov 6, 2025)
+- `idx_events_event_start`: On event_start (for attendance window queries, added Nov 20, 2025)
+- `idx_events_event_end`: On event_end (for attendance window queries, added Nov 20, 2025)
 
-**Total Indexes**: 8
+**Total Indexes**: 10
 
 **Triggers:**
 - `update_events_updated_at`: Auto-updates `updated_at` column on row modification
@@ -883,14 +917,23 @@ export interface EventQueryOptions extends EventFilters {
 - Filter by date range
 - Upcoming vs past event filtering
 
-### 6. Organization Integration
+### 6. Attendance Window Management (Added Nov 20, 2025)
+- **Optional attendance tracking**: Events can have `event_start` and `event_end` fields
+- **Reminder-only events**: Leave both fields empty for events without attendance tracking
+- **Time-based validation**: Attendance can only be marked between `event_start` and `event_end`
+- **User-friendly error messages**: Clear feedback when attendance is attempted outside the window
+  - Before window: "Attendance has not started yet. Please try again after [formatted local time]"
+  - After window: "Attendance period has ended. The deadline was [formatted local time]"
+- **Validation**: Ensures `event_start` < `event_end` when both are provided
+- **Database-level enforcement**: Attendance service validates time window before allowing submissions
+
+### 7. Organization Integration
 - Events tied to specific organizations
 - Only organization members can view events
 - Cascade delete when organization deleted
 - Organization context in event display
 
-### 7. Future Features (Planned)
-- **Attendance Tracking**: NFC/QR code check-in
+### 8. Future Features (Planned)
 - **Attendance Reports**: Export attendance data
 - **Event Notifications**: Remind members of upcoming events
 - **Recurring Events**: Create repeating events

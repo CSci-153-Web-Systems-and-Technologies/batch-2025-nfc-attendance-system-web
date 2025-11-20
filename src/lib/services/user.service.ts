@@ -1,8 +1,142 @@
 import { createClient } from '@/lib/server'
 import type { CreateUserInput, UpdateUserInput, User, AuthProvider } from '@/types/user'
+import type { CanWriteTagResponse, GenerateTagResponse, TagWriteRecord, PrepareTagResponse } from '@/types/tag'
 
 export class UserService {
   /**
+    /**
+     * Get user by unified tag ID (replaces getUserByNfcTag and getUserByQrCode)
+     */
+    static async getUserByTag(tagId: string): Promise<User | null> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('tag_id', tagId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching user by tag:', error)
+        return null
+      }
+
+      return data
+    }
+
+    /**
+     * Check if a user can write/generate a new tag based on cooldown period
+     */
+    static async canWriteTag(userId: string): Promise<CanWriteTagResponse> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase.rpc('can_user_write_tag', {
+        p_user_id: userId
+      })
+
+      if (error) {
+        console.error('Error checking tag write eligibility:', error)
+        throw new Error('Failed to check tag write eligibility')
+      }
+
+      return data as CanWriteTagResponse
+    }
+
+    /**
+     * Generate a new tag ID for a user
+     * Enforces cooldown period via database function
+     * @deprecated Use prepareTag + confirmTag for two-phase commit
+     */
+    static async generateTag(userId: string): Promise<GenerateTagResponse> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase.rpc('generate_and_assign_tag', {
+        p_user_id: userId
+      })
+
+      if (error) {
+        console.error('Error generating tag:', error)
+        // Check if it's a cooldown error
+        if (error.message.includes('Cooldown period not elapsed')) {
+          throw new Error(error.message)
+        }
+        throw new Error('Failed to generate tag')
+      }
+
+      return data as GenerateTagResponse
+    }
+
+    /**
+     * Prepare a new tag ID for writing (Phase 1 of two-phase commit)
+     * Generates a temporary tag ID without updating the user's active tag
+     * Must be followed by confirmTag after successful NFC write
+     */
+    static async prepareTag(userId: string): Promise<PrepareTagResponse> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase.rpc('prepare_tag_write', {
+        p_user_id: userId
+      })
+
+      if (error) {
+        console.error('Error preparing tag:', error)
+        // Check if it's a cooldown error
+        if (error.message.includes('Cooldown period not elapsed')) {
+          throw new Error(error.message)
+        }
+        throw new Error('Failed to prepare tag')
+      }
+
+      return data as PrepareTagResponse
+    }
+
+    /**
+     * Confirm a pending tag write (Phase 2 of two-phase commit)
+     * Only call this after successfully writing the tag to NFC
+     * This updates the user's active tag and records it in history
+     */
+    static async confirmTag(userId: string, pendingId: string): Promise<GenerateTagResponse> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase.rpc('confirm_tag_write', {
+        p_user_id: userId,
+        p_pending_id: pendingId
+      })
+
+      if (error) {
+        console.error('Error confirming tag:', error)
+        if (error.message.includes('expired')) {
+          throw new Error('Tag preparation expired. Please generate a new tag.')
+        }
+        if (error.message.includes('not found')) {
+          throw new Error('Invalid tag preparation ID.')
+        }
+        throw new Error('Failed to confirm tag write')
+      }
+
+      return data as GenerateTagResponse
+    }
+
+    /**
+     * Get tag write history for a user
+     */
+    static async getTagWriteHistory(userId: string, limit: number = 10): Promise<TagWriteRecord[]> {
+      const supabase = await createClient()
+    
+      const { data, error } = await supabase.rpc('get_tag_write_history', {
+        p_user_id: userId,
+        p_limit: limit
+      })
+
+      if (error) {
+        console.error('Error fetching tag write history:', error)
+        return []
+      }
+
+      return data || []
+    }
+
+    /**
    * Get user profile by ID (which is the auth user ID)
    */
   static async getUserById(userId: string): Promise<User | null> {
@@ -44,6 +178,7 @@ export class UserService {
 
   /**
    * Get user by NFC tag ID
+    * @deprecated Use getUserByTag instead
    */
   static async getUserByNfcTag(nfcTagId: string): Promise<User | null> {
     const supabase = await createClient()
@@ -64,6 +199,7 @@ export class UserService {
 
   /**
    * Get user by QR code data
+    * @deprecated Use getUserByTag instead
    */
   static async getUserByQrCode(qrCodeData: string): Promise<User | null> {
     const supabase = await createClient()

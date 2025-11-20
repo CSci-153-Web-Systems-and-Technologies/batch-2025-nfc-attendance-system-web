@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LayoutDashboard, Users, User, LogOut, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, User, LogOut, Settings, Moon, Sun } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,8 @@ import {
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/client'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { getTheme, toggleTheme } from '@/lib/theme-client'
 
 // Menu items
 const navigationItems = [
@@ -42,6 +44,12 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { state } = useSidebar()
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const currentTheme = getTheme()
+    setTheme(currentTheme)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -51,6 +59,11 @@ export function AppSidebar() {
     } catch (error) {
       console.error('Error signing out:', error)
     }
+  }
+
+  const handleThemeToggle = async () => {
+    const newTheme = await toggleTheme()
+    setTheme(newTheme)
   }
 
   return (
@@ -105,6 +118,14 @@ export function AppSidebar() {
                     <Settings />
                     <span>Settings</span>
                   </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              {/* Theme Toggle */}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleThemeToggle} className="w-full">
+                  {theme === 'dark' ? <Sun /> : <Moon />}
+                  <span>Theme</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

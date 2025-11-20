@@ -10,6 +10,8 @@ export interface Event {
   created_by: string
   created_at: string
   updated_at: string
+  event_start: string | null
+  event_end: string | null
 }
 
 export interface EventWithOrganization extends Event {
@@ -38,6 +40,8 @@ export interface CreateEventInput {
   organization_id: string
   description?: string
   location?: string
+  event_start?: string
+  event_end?: string
 }
 
 export interface UpdateEventInput {
@@ -45,6 +49,8 @@ export interface UpdateEventInput {
   date?: string
   description?: string
   location?: string
+  event_start?: string
+  event_end?: string
 }
 
 export interface EventFilters {
