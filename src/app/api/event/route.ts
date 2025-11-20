@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
       organization_id: body.organization_id,
       description: body.description,
       location: body.location,
+      event_start: body.event_start,
+      event_end: body.event_end,
     }
 
     // Validate required fields
@@ -123,6 +125,27 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid date format' },
         { status: 400 }
       )
+    }
+
+    // Validate event_start and event_end if provided
+    if (input.event_start) {
+      const eventStartObj = new Date(input.event_start)
+      if (isNaN(eventStartObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid event_start date format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (input.event_end) {
+      const eventEndObj = new Date(input.event_end)
+      if (isNaN(eventEndObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid event_end date format' },
+          { status: 400 }
+        )
+      }
     }
 
     const event = await EventService.createEvent(userId, input)

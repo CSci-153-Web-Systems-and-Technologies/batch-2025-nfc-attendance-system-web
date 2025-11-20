@@ -38,6 +38,27 @@ export class EventService {
       }
     }
 
+    // Validate event_start and event_end relationship
+    if ('event_start' in input && 'event_end' in input) {
+      const eventStart = input.event_start
+      const eventEnd = input.event_end
+
+      // If both are provided, validate that start < end
+      if (eventStart && eventEnd) {
+        const startDate = new Date(eventStart)
+        const endDate = new Date(eventEnd)
+
+        if (startDate >= endDate) {
+          return 'Event Start must be before Event End'
+        }
+      }
+
+      // If one is provided but not the other, return error
+      if ((eventStart && !eventEnd) || (!eventStart && eventEnd)) {
+        return 'Both Event Start and Event End must be set together, or leave both empty'
+      }
+    }
+
     return null
   }
   /**
@@ -80,6 +101,8 @@ export class EventService {
         organization_id: input.organization_id,
         description: input.description || null,
         location: input.location || null,
+        event_start: input.event_start || null,
+        event_end: input.event_end || null,
         created_by: userId,
       })
       .select()
@@ -358,6 +381,8 @@ export class EventService {
     if (input.description !== undefined)
       updateData.description = input.description
     if (input.location !== undefined) updateData.location = input.location
+    if (input.event_start !== undefined) updateData.event_start = input.event_start
+    if (input.event_end !== undefined) updateData.event_end = input.event_end
 
     const { data, error } = await supabase
       .from('events')

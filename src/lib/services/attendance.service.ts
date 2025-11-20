@@ -22,6 +22,57 @@ export class AttendanceService {
   ): Promise<MarkAttendanceResponse> {
     const supabase = await createClient();
 
+    // First, fetch the event to check attendance window
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('event_start, event_end, event_name')
+      .eq('id', input.event_id)
+      .single();
+
+    if (eventError) {
+      console.error('Error fetching event:', eventError);
+      throw new Error('Event not found');
+    }
+
+    // Check if attendance is within the allowed time window
+    if (event.event_start && event.event_end) {
+      const now = new Date();
+      const startTime = new Date(event.event_start);
+      const endTime = new Date(event.event_end);
+
+      if (now < startTime) {
+        // Format the start time in a user-friendly way
+        const formattedStartTime = startTime.toLocaleString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+        throw new Error(
+          `Attendance has not started yet. Please try again after ${formattedStartTime}`
+        );
+      }
+
+      if (now > endTime) {
+        // Format the end time in a user-friendly way
+        const formattedEndTime = endTime.toLocaleString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+        throw new Error(
+          `Attendance period has ended. The deadline was ${formattedEndTime}`
+        );
+      }
+    }
+
     const { data, error } = await supabase.rpc('mark_attendance', {
       p_event_id: input.event_id,
       p_user_id: input.user_id,

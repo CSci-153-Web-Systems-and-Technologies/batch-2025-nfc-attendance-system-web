@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2 } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
+import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2, Clock } from 'lucide-react'
 import type { OrganizationWithRole } from '@/types/organization'
 
 interface CreateEventFormProps {
@@ -23,10 +24,12 @@ export function CreateEventForm({ organizationId, organizationName, organization
 
   const [formData, setFormData] = useState({
     event_name: '',
-    date: '',
     location: '',
     description: '',
   })
+  
+  const [eventDate, setEventDate] = useState<Date | undefined>(undefined)
+  const [eventEnd, setEventEnd] = useState<Date | undefined>(undefined)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -54,12 +57,18 @@ export function CreateEventForm({ organizationId, organizationName, organization
     }
 
     // Validate date
-    if (!formData.date) {
+    if (!eventDate) {
       return 'Event date and time is required'
     }
-    const eventDate = new Date(formData.date)
     if (isNaN(eventDate.getTime())) {
       return 'Invalid date format'
+    }
+
+    // Validate that event_end is after event date if provided
+    if (eventEnd) {
+      if (eventDate >= eventEnd) {
+        return 'Event End must be after Event Date and Time'
+      }
     }
 
     // Validate location (max 500 characters)
@@ -92,18 +101,26 @@ export function CreateEventForm({ organizationId, organizationName, organization
       // Use organizationId from props if available (org-specific mode), otherwise use selected org (global mode)
       const targetOrgId = organizationId || selectedOrgId
 
+      const requestBody: any = {
+        event_name: formData.event_name,
+        date: eventDate!.toISOString(),
+        organization_id: targetOrgId,
+        location: formData.location || null,
+        description: formData.description || null,
+      }
+
+      // If event_end is provided, use eventDate as event_start
+      if (eventEnd) {
+        requestBody.event_start = eventDate!.toISOString()
+        requestBody.event_end = eventEnd.toISOString()
+      }
+
       const response = await fetch('/api/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          event_name: formData.event_name,
-          date: new Date(formData.date).toISOString(),
-          organization_id: targetOrgId,
-          location: formData.location || null,
-          description: formData.description || null,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -231,18 +248,45 @@ export function CreateEventForm({ organizationId, organizationName, organization
             <div className="space-y-2">
               <Label htmlFor="date" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Date and Time *
+                Event Date and Time *
               </Label>
-              <Input
-                id="date"
-                name="date"
-                type="datetime-local"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full"
-                required
+              <DateTimePicker
+                date={eventDate}
+                setDate={setEventDate}
+                placeholder="Pick event date and time"
+                disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                When the event starts (also when attendance tracking begins)
+              </p>
             </div>
+
+            {/* Event End (Attendance Window End) */}
+            <div className="space-y-2">
+              <Label htmlFor="event_end" className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Event End (Optional)
+              </Label>
+              <DateTimePicker
+                date={eventEnd}
+                setDate={setEventEnd}
+                placeholder="When does attendance close?"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                When attendance tracking ends
+              </p>
+            </div>
+
+            {/* Attendance Window Helper Text */}
+            {eventEnd && (
+              <div className="bg-muted/50 border border-border rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong>ℹ️ Attendance Window:</strong> Attendance can be taken from the Event Date and Time until the Event End. 
+                  Leave Event End blank if this is a reminder-only event with no attendance tracking.
+                </p>
+              </div>
+            )}
 
             {/* Location */}
             <div className="space-y-2">
