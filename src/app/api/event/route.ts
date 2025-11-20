@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     // Check for special query types
     const upcoming = searchParams.get('upcoming') === 'true'
     const past = searchParams.get('past') === 'true'
+    const ongoing = searchParams.get('ongoing') === 'true'
     const limit = searchParams.get('limit')
       ? parseInt(searchParams.get('limit') as string)
       : undefined
@@ -59,6 +60,8 @@ export async function GET(request: NextRequest) {
       events = await EventService.getUpcomingEvents(userId, limit)
     } else if (past) {
       events = await EventService.getPastEvents(userId, limit)
+    } else if (ongoing) {
+      events = await EventService.getOngoingEvents(userId, limit)
     } else {
       events = await EventService.getUserEvents(userId, filters)
     }

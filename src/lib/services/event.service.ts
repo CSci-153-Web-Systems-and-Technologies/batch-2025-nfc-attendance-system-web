@@ -539,6 +539,76 @@ export class EventService {
   }
 
   /**
+   * Get currently ongoing events for a user
+   * Events where now >= event_start AND now <= event_end
+   * Falls back to same-day events if event_start/event_end are null
+   */
+  static async getOngoingEvents(
+    userId: string,
+    limit: number = 10
+  ): Promise<EventWithOrganization[]> {
+    const supabase = await createClient()
+
+    // First get user's organizations
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', userId)
+
+    if (!memberships || memberships.length === 0) {
+      return []
+    }
+
+    const organizationIds = memberships.map((m) => m.organization_id)
+    const now = new Date().toISOString()
+
+    // Query events with attendance windows that are currently active
+    // OR events on today's date without defined windows
+    const { data, error } = await supabase
+      .from('events')
+      .select(
+        `
+        *,
+        organizations!inner(id, name)
+      `
+      )
+      .in('organization_id', organizationIds)
+      .or(`and(event_start.lte.${now},event_end.gte.${now}),and(event_start.is.null,event_end.is.null,date.gte.${new Date().toISOString().split('T')[0]},date.lt.${new Date(Date.now() + 86400000).toISOString().split('T')[0]})`)
+      .order('date', { ascending: true })
+      .limit(limit)
+
+    if (error) {
+      console.error('Error fetching ongoing events:', error)
+      return []
+    }
+
+    // Transform the data to match EventWithOrganization type
+    return data.map((event) => {
+      const organization = Array.isArray(event.organizations)
+        ? event.organizations[0]
+        : event.organizations
+
+      return {
+        id: event.id,
+        event_name: event.event_name,
+        date: event.date,
+        organization_id: event.organization_id,
+        description: event.description,
+        location: event.location,
+        created_by: event.created_by,
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        event_start: event.event_start,
+        event_end: event.event_end,
+        organization: {
+          id: organization.id,
+          name: organization.name,
+        },
+      }
+    })
+  }
+
+  /**
    * Get event count for an organization
    * Uses get_organization_event_count() database function
    */

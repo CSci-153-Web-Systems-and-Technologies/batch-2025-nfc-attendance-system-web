@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
-import { Calendar, MapPin, Users, User, TrendingUp, Clock } from 'lucide-react'
+import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { AttendanceList } from '@/components/events/attendance-list'
+import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
 
 export default async function EventDetailPage({
   params,
@@ -28,15 +29,21 @@ export default async function EventDetailPage({
     .from('events')
     .select(`
       *,
-      organization:organizations(id, name, tag),
-      created_by_user:users!events_created_by_fkey(id, name, email)
+      organizations!inner(id, name, tag),
+      created_by_user:users!fk_created_by_user(id, name, email)
     `)
     .eq('id', eventId)
     .single()
 
   if (eventError || !event) {
+    console.error('Error fetching event:', eventError)
     redirect(`/organizations/${organizationId}/events`)
   }
+
+  // Transform organizations array to single object
+  const organization = Array.isArray(event.organizations) 
+    ? event.organizations[0] 
+    : event.organizations
 
   // Verify user is a member of the organization
   const { data: membership, error: memberError } = await supabase
@@ -75,6 +82,9 @@ export default async function EventDetailPage({
 
   const userAttended = !attendedError && hasAttended === true
 
+  // Get event status
+  const eventStatus = getEventStatus(event)
+
   // Format date
   const eventDate = new Date(event.date)
   const formattedDate = eventDate.toLocaleDateString('en-US', {
@@ -87,6 +97,13 @@ export default async function EventDetailPage({
     minute: '2-digit',
     hour12: true,
   })
+
+  // Format attendance window times if available
+  const hasAttendanceWindow = event.event_start && event.event_end
+  const attendanceStartDate = hasAttendanceWindow ? formatEventDate(event.event_start) : null
+  const attendanceStartTime = hasAttendanceWindow ? formatEventTime(event.event_start) : null
+  const attendanceEndDate = hasAttendanceWindow ? formatEventDate(event.event_end) : null
+  const attendanceEndTime = hasAttendanceWindow ? formatEventTime(event.event_end) : null
 
   const totalAttended = summary?.total_attended || 0
   const totalMembers = summary?.total_members || 0
@@ -108,11 +125,28 @@ export default async function EventDetailPage({
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                {event.event_name}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                  {event.event_name}
+                </h1>
+                {eventStatus === 'ongoing' && (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full">
+                    Currently Happening
+                  </span>
+                )}
+                {eventStatus === 'upcoming' && (
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
+                    Upcoming
+                  </span>
+                )}
+                {eventStatus === 'past' && (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-semibold rounded-full">
+                    Past
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 mt-1">
-                {event.organization.name}
+                {organization.name}
               </p>
             </div>
             {canTakeAttendance && (
@@ -168,6 +202,29 @@ export default async function EventDetailPage({
                 </div>
               </div>
 
+              {/* Attendance Window */}
+              {hasAttendanceWindow && (
+                <div className="flex items-start gap-3">
+                  <Timer className="h-5 w-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground">Attendance Window</p>
+                    <p className="text-sm text-muted-foreground">
+                      {attendanceStartDate === attendanceEndDate ? (
+                        <>
+                          {attendanceStartDate}<br />
+                          {attendanceStartTime} - {attendanceEndTime}
+                        </>
+                      ) : (
+                        <>
+                          From: {attendanceStartDate} at {attendanceStartTime}<br />
+                          Until: {attendanceEndDate} at {attendanceEndTime}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Your Status */}
               <div className="flex items-start gap-3">
                 <Clock className="h-5 w-5 text-primary mt-0.5" />
@@ -179,6 +236,18 @@ export default async function EventDetailPage({
                 </div>
               </div>
             </div>
+
+            {/* Attendance Window Info Alert */}
+            {!hasAttendanceWindow && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-start gap-2 text-sm text-muted-foreground bg-amber-50 p-3 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <p>
+                    This event does not have a defined attendance window. Attendance tracking may not be available.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             {event.description && (

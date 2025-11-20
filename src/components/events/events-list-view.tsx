@@ -12,13 +12,17 @@ import {
   ArrowLeft,
   Clock,
   FileText,
+  Timer,
 } from 'lucide-react'
 import { MembershipRole } from '@/types/membership'
+import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
 
 interface Event {
   id: string
   event_name: string
   date: string
+  event_start?: string | null
+  event_end?: string | null
   location: string | null
   description: string | null
   created_by: string
@@ -43,20 +47,14 @@ export function EventsListView({
   events,
 }: EventsListViewProps) {
   const router = useRouter()
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all')
+  const [filter, setFilter] = useState<'all' | 'ongoing' | 'upcoming' | 'past'>('all')
 
   const canCreateEvents = ['Owner', 'Admin', 'Attendance Taker'].includes(userRole)
 
-  const now = new Date()
-
   const filteredEvents = events.filter((event) => {
-    const eventDate = new Date(event.date)
-    if (filter === 'upcoming') {
-      return eventDate > now
-    } else if (filter === 'past') {
-      return eventDate <= now
-    }
-    return true
+    if (filter === 'all') return true
+    const status = getEventStatus(event)
+    return status === filter
   })
 
   const formatDate = (dateString: string) => {
@@ -126,6 +124,16 @@ export function EventsListView({
               All Events
             </button>
             <button
+              onClick={() => setFilter('ongoing')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'ongoing'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-accent'
+              }`}
+            >
+              Currently Happening
+            </button>
+            <button
               onClick={() => setFilter('upcoming')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === 'upcoming'
@@ -159,7 +167,9 @@ export function EventsListView({
                 No events found
               </h3>
               <p className="text-muted-foreground mb-6">
-                {filter === 'upcoming'
+                {filter === 'ongoing'
+                  ? 'No events currently happening.'
+                  : filter === 'upcoming'
                   ? 'No upcoming events scheduled.'
                   : filter === 'past'
                   ? 'No past events.'
@@ -181,11 +191,15 @@ export function EventsListView({
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredEvents.map((event) => (
+          {filteredEvents.map((event) => {
+            const eventStatus = getEventStatus(event)
+            const hasAttendanceWindow = event.event_start && event.event_end
+            
+            return (
             <Card
               key={event.id}
               className={`bg-card shadow-md hover:shadow-lg transition-shadow cursor-pointer ${
-                isUpcoming(event.date) ? 'border-l-4 border-l-primary' : ''
+                eventStatus === 'ongoing' ? 'border-l-4 border-l-green-500' : eventStatus === 'upcoming' ? 'border-l-4 border-l-primary' : ''
               }`}
               onClick={() => router.push(`/organizations/${organizationId}/events/${event.id}`)}
             >
@@ -198,11 +212,17 @@ export function EventsListView({
                       <h3 className="text-lg font-semibold text-foreground">
                         {event.event_name}
                       </h3>
-                      {isUpcoming(event.date) ? (
+                      {eventStatus === 'ongoing' && (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                          Currently Happening
+                        </span>
+                      )}
+                      {eventStatus === 'upcoming' && (
                         <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
                           Upcoming
                         </span>
-                      ) : (
+                      )}
+                      {eventStatus === 'past' && (
                         <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-semibold rounded-full">
                           Past
                         </span>
@@ -213,13 +233,23 @@ export function EventsListView({
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-primary" />
-                        <span>{formatDate(event.date)}</span>
+                        <span>{formatEventDate(event.date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-primary" />
-                        <span>{formatTime(event.date)}</span>
+                        <span>{formatEventTime(event.date)}</span>
                       </div>
                     </div>
+
+                    {/* Attendance Window */}
+                    {hasAttendanceWindow && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-accent/50 p-2 rounded-md">
+                        <Timer className="h-4 w-4 text-primary" />
+                        <span>
+                          Attendance: {formatEventTime(event.event_start!)} - {formatEventTime(event.event_end!)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Location */}
                     {event.location && (
@@ -256,7 +286,8 @@ export function EventsListView({
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )
+          })}
         </div>
       )}
     </div>
