@@ -36,11 +36,15 @@ export default function DashboardPage() {
         setLoading(true)
         setError(null)
 
-        const [upcomingRes, pastRes] = await Promise.all([
+        const [ongoingRes, upcomingRes, pastRes] = await Promise.all([
+          fetch('/api/event?ongoing=true&limit=20', { cache: 'no-store' }),
           fetch('/api/event?upcoming=true&limit=20', { cache: 'no-store' }),
           fetch('/api/event?past=true&limit=20', { cache: 'no-store' }),
         ])
 
+        if (!ongoingRes.ok) {
+          throw new Error('Failed to load ongoing events')
+        }
         if (!upcomingRes.ok) {
           throw new Error('Failed to load upcoming events')
         }
@@ -48,27 +52,12 @@ export default function DashboardPage() {
           throw new Error('Failed to load past events')
         }
 
+        const ongoingData: DashboardEvent[] = await ongoingRes.json()
         const upcomingData: DashboardEvent[] = await upcomingRes.json()
         const pastData: DashboardEvent[] = await pastRes.json()
 
-        // Compute today's (ongoing) events using local date
-        const today = new Date()
-        const isSameDay = (a: Date, b: Date) =>
-          a.getFullYear() === b.getFullYear() &&
-          a.getMonth() === b.getMonth() &&
-          a.getDate() === b.getDate()
-
-        const todayEvents = upcomingData.filter((e) =>
-          isSameDay(new Date(e.date), today)
-        )
-
-        // Upcoming (exclude today to avoid duplication)
-        const futureEvents = upcomingData.filter(
-          (e) => !isSameDay(new Date(e.date), today)
-        )
-
-        setOnGoing(todayEvents)
-        setUpcoming(futureEvents)
+        setOnGoing(ongoingData)
+        setUpcoming(upcomingData)
         setFinished(pastData)
       } catch (err: any) {
         console.error('Dashboard events load error:', err)
@@ -166,7 +155,7 @@ export default function DashboardPage() {
             </Link>
 
             {/* Create Event Card */}
-            <Link href="/dashboard/create-event">
+            <Link href="/events/create">
               <div className="bg-card rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-border hover:border-primary/50 cursor-pointer group">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">

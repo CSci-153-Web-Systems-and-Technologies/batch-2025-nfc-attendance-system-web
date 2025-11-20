@@ -93,6 +93,8 @@ export async function PUT(
       date: body.date,
       description: body.description,
       location: body.location,
+      event_start: body.event_start,
+      event_end: body.event_end,
     }
 
     // Validate date format if provided
@@ -101,6 +103,28 @@ export async function PUT(
       if (isNaN(dateObj.getTime())) {
         return NextResponse.json(
           { error: 'Invalid date format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate event_start format if provided
+    if (input.event_start) {
+      const eventStartObj = new Date(input.event_start)
+      if (isNaN(eventStartObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid event_start date format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate event_end format if provided
+    if (input.event_end) {
+      const eventEndObj = new Date(input.event_end)
+      if (isNaN(eventEndObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid event_end date format' },
           { status: 400 }
         )
       }
