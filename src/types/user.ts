@@ -14,8 +14,9 @@ export interface User {
   user_type: UserType
   auth_provider: AuthProvider
   has_password: boolean
-  nfc_tag_id: string | null
-  qr_code_data: string | null
+  tag_id: string | null // Unified tag identifier for NFC and QR
+  nfc_tag_id: string | null // DEPRECATED: Use tag_id instead
+  qr_code_data: string | null // DEPRECATED: Use tag_id instead
   created_at: string
   updated_at: string
 }
@@ -33,8 +34,9 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   name?: string
   user_type?: UserType
-  nfc_tag_id?: string
-  qr_code_data?: string
+  tag_id?: string
+  nfc_tag_id?: string // DEPRECATED: Use tag_id instead
+  qr_code_data?: string // DEPRECATED: Use tag_id instead
 }
 
 /**
