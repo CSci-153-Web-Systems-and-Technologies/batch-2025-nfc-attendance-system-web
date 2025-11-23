@@ -170,72 +170,9 @@ export function AttendanceScanner({
 
     setIsProcessing(true)
 
-    try {
-      // Look up user by tag
-      const userResponse = await fetch(`/api/user/by-tag?tag_id=${encodeURIComponent(tagId)}`)
-
-      if (!userResponse.ok) {
-        addScannedUser({
-          id: '',
-          name: 'Unknown',
-          email: '',
-          user_type: '',
-          tag_id: tagId,
-          marked_at: new Date().toISOString(),
-          scan_method: method,
-          status: 'error',
-          message: 'User not found with this tag',
-        })
-        setIsProcessing(false)
-        return
-      }
-
-      const userData = await userResponse.json()
-      const user = userData.user
-
-      // Mark attendance
-      const attendanceResponse = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventId,
-          user_id: user.id,
-          scan_method: method,
-          location_lat: null,
-          location_lng: null,
-        }),
-      })
-
-      const attendanceData = await attendanceResponse.json()
-
-      if (!attendanceResponse.ok) {
-        const isDuplicate = attendanceData.error?.includes('already marked')
-        addScannedUser({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          user_type: user.user_type,
-          tag_id: tagId,
-          marked_at: new Date().toISOString(),
-          scan_method: method,
-          status: isDuplicate ? 'duplicate' : 'error',
-          message: attendanceData.error || 'Failed to mark attendance',
-        })
-      } else {
-        addScannedUser({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          user_type: user.user_type,
-          tag_id: tagId,
-          marked_at: attendanceData.attendance.marked_at,
-          scan_method: method,
-          status: 'success',
-          message: 'Attendance marked successfully',
-        })
-      }
-    } catch (error: any) {
-      console.error('Error processing tag:', error)
+    // Basic tag format validation (UUID pattern)
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!tagId || tagId.trim().length === 0) {
       addScannedUser({
         id: '',
         name: 'Error',
@@ -245,7 +182,282 @@ export function AttendanceScanner({
         marked_at: new Date().toISOString(),
         scan_method: method,
         status: 'error',
-        message: error.message || 'Failed to process tag',
+        message: 'Invalid tag: Tag ID is empty',
+      })
+      setIsProcessing(false)
+      return
+    }
+
+    if (!uuidPattern.test(tagId.trim())) {
+      addScannedUser({
+        id: '',
+        name: 'Error',
+        email: '',
+        user_type: '',
+        tag_id: tagId,
+        marked_at: new Date().toISOString(),
+        scan_method: method,
+        status: 'error',
+        message: 'Invalid tag format: Expected UUID format',
+      })
+      setIsProcessing(false)
+      return
+    }
+
+    try {
+      // STEP 1: Look up user by tag
+      let userResponse: Response
+      try {
+        userResponse = await fetch(`/api/user/by-tag?tag_id=${encodeURIComponent(tagId)}`)
+      } catch (networkError: any) {
+        console.error('Network error during user lookup:', networkError)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Network error: Unable to connect to server',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Handle HTTP error responses with specific messages
+      if (!userResponse.ok) {
+        let errorMessage = 'User not found with this tag'
+        
+        switch (userResponse.status) {
+          case 400:
+            errorMessage = 'Invalid request: Missing tag ID parameter'
+            break
+          case 401:
+            errorMessage = 'Unauthorized: Please log in again'
+            break
+          case 404:
+            errorMessage = 'No user assigned to this tag'
+            break
+          case 500:
+            errorMessage = 'Server error during user lookup'
+            break
+          default:
+            errorMessage = `User lookup failed (${userResponse.status})`
+        }
+
+        addScannedUser({
+          id: '',
+          name: 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: errorMessage,
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Parse and normalize user response
+      let rawUserData: any
+      try {
+        rawUserData = await userResponse.json()
+      } catch (parseError: any) {
+        console.error('Failed to parse user response:', parseError)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Malformed response from server',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Normalize response structure (handles both flat and nested formats)
+      const user = rawUserData.user ?? rawUserData
+
+      // Validate user object structure
+      if (!user || typeof user !== 'object') {
+        console.error('Invalid user data structure:', rawUserData)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data structure',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Validate required user fields
+      if (!user.id || typeof user.id !== 'string') {
+        console.error('Missing or invalid user ID:', user)
+        addScannedUser({
+          id: '',
+          name: user.name || 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data: Missing user ID',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      if (!user.name || typeof user.name !== 'string') {
+        console.error('Missing or invalid user name:', user)
+        addScannedUser({
+          id: user.id,
+          name: 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data: Missing user name',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // STEP 2: Mark attendance
+      let attendanceResponse: Response
+      try {
+        attendanceResponse = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventId,
+            user_id: user.id,
+            scan_method: method,
+            location_lat: null,
+            location_lng: null,
+          }),
+        })
+      } catch (networkError: any) {
+        console.error('Network error during attendance marking:', networkError)
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Network error: Unable to mark attendance',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Parse attendance response
+      let attendanceData: any
+      try {
+        attendanceData = await attendanceResponse.json()
+      } catch (parseError: any) {
+        console.error('Failed to parse attendance response:', parseError)
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Malformed attendance response',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Handle attendance response based on status code
+      if (!attendanceResponse.ok) {
+        let errorMessage = 'Failed to mark attendance'
+        let status: 'error' | 'duplicate' = 'error'
+
+        switch (attendanceResponse.status) {
+          case 400:
+            errorMessage = attendanceData.error || 'Invalid attendance request'
+            break
+          case 401:
+            errorMessage = 'Unauthorized: Please log in again'
+            break
+          case 403:
+            errorMessage = 'Permission denied: You cannot mark attendance for this event'
+            break
+          case 404:
+            errorMessage = 'Event not found'
+            break
+          case 409:
+            errorMessage = 'Attendance already marked for this event'
+            status = 'duplicate'
+            break
+          case 500:
+            errorMessage = attendanceData.error || 'Server error while marking attendance'
+            break
+          default:
+            errorMessage = attendanceData.error || `Attendance failed (${attendanceResponse.status})`
+        }
+
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: status,
+          message: errorMessage,
+        })
+      } else {
+        // Success case
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: attendanceData.attendance?.marked_at || new Date().toISOString(),
+          scan_method: method,
+          status: 'success',
+          message: 'Attendance marked successfully',
+        })
+      }
+    } catch (error: any) {
+      // Catch-all for unexpected errors
+      console.error('Unexpected error processing tag:', error)
+      addScannedUser({
+        id: '',
+        name: 'Error',
+        email: '',
+        user_type: '',
+        tag_id: tagId,
+        marked_at: new Date().toISOString(),
+        scan_method: method,
+        status: 'error',
+        message: error.message || 'Unexpected error occurred',
       })
     } finally {
       setIsProcessing(false)
