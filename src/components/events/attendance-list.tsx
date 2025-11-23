@@ -31,7 +31,8 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
         }
 
         const data = await response.json()
-        setAttendanceRecords(data.attendance || [])
+        console.log('Fetched attendance data:', data)
+        setAttendanceRecords(data.attendees || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load attendance')
         console.error('Error fetching attendance:', err)
