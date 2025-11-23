@@ -204,6 +204,8 @@ export class EventService {
       created_by: data.created_by,
       created_at: data.created_at,
       updated_at: data.updated_at,
+      event_start: data.event_start,
+      event_end: data.event_end,
       organization: {
         id: data.organization_id,
         name: data.organization_name,
@@ -479,6 +481,8 @@ export class EventService {
       created_by: event.created_by,
       created_at: event.created_at,
       updated_at: event.updated_at,
+      event_start: event.event_start,
+      event_end: event.event_end,
       organization: {
         id: event.organization_id,
         name: event.organization_name,
@@ -531,6 +535,8 @@ export class EventService {
       created_by: event.created_by,
       created_at: event.created_at,
       updated_at: event.updated_at,
+      event_start: event.event_start,
+      event_end: event.event_end,
       organization: {
         id: event.organization_id,
         name: event.organization_name,

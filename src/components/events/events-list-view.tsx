@@ -75,6 +75,8 @@ export function EventsListView({
     })
   }
 
+  const now = new Date()
+
   const isUpcoming = (dateString: string) => {
     return new Date(dateString) > now
   }

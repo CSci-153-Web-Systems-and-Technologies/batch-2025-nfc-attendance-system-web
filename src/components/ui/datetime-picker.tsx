@@ -18,9 +18,10 @@ interface DateTimePickerProps {
   date?: Date
   setDate: (date: Date | undefined) => void
   placeholder?: string
+  disabled?: boolean
 }
 
-export function DateTimePicker({ date, setDate, placeholder = "MM/DD/YYYY hh:mm aa" }: DateTimePickerProps) {
+export function DateTimePicker({ date, setDate, placeholder = "MM/DD/YYYY hh:mm aa", disabled = false }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false)
 
   const hours = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -72,6 +73,7 @@ export function DateTimePicker({ date, setDate, placeholder = "MM/DD/YYYY hh:mm 
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          disabled={disabled}
           className={cn(
             "w-full justify-start text-left font-normal",
             !date && "text-muted-foreground"
