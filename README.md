@@ -675,6 +675,7 @@ For questions or issues:
 - Advanced reporting and analytics
 - Event templates
 - Recurring events
+- Map preview on event detail pages
 
 ---
 

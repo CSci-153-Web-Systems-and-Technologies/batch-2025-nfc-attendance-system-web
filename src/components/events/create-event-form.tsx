@@ -2,14 +2,28 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DateTimePicker } from '@/components/ui/datetime-picker'
 import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2, Clock, Crosshair, Ruler } from 'lucide-react'
-import { MapPicker } from '@/components/events/map-picker'
+import { LocationAutocomplete } from '@/components/events/location-autocomplete'
 import type { OrganizationWithRole } from '@/types/organization'
+
+// Dynamically import MapPicker with SSR disabled to avoid Leaflet window errors
+const MapPicker = dynamic(
+  () => import('@/components/events/map-picker').then(mod => ({ default: mod.MapPicker })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-64 w-full rounded-md border border-input bg-muted flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+)
 
 interface CreateEventFormProps {
   organizationId?: string
@@ -304,26 +318,23 @@ export function CreateEventForm({ organizationId, organizationName, organization
               </div>
             )}
 
-            {/* Location */}
-            <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium text-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Location
-              </Label>
-              <Input
-                id="location"
-                name="location"
-                type="text"
-                value={formData.location}
-                onChange={handleInputChange}
-                placeholder="e.g., Main Conference Hall, Building A"
-                className="w-full"
-                maxLength={500}
-              />
-              <p className="text-xs text-muted-foreground">
-                {formData.location.length}/500 characters
-              </p>
-            </div>
+            {/* Location with Autocomplete */}
+            <LocationAutocomplete
+              organizationId={organizationId || selectedOrgId}
+              value={formData.location}
+              onChange={(value) => setFormData((prev) => ({ ...prev, location: value }))}
+              onCoordinatesChange={(lat, lng) => {
+                // When user selects a suggestion, auto-fill coordinates and enable geo
+                setLatitude(lat)
+                setLongitude(lng)
+                if (!enableGeo) {
+                  setEnableGeo(true) // Auto-enable geo when selecting from history
+                }
+              }}
+              latitude={enableGeo ? latitude : null}
+              longitude={enableGeo ? longitude : null}
+              disabled={loading}
+            />
 
             {/* Enable precise map location */}
             <div className="space-y-2 border rounded-md p-4">
@@ -343,7 +354,7 @@ export function CreateEventForm({ organizationId, organizationName, organization
                 Toggle to pin exact event location on a map.
               </p>
               {enableGeo && (
-                <div className="space-y-3">
+                <div className="space-y-3 relative z-0">
                   <MapPicker
                     latitude={latitude}
                     longitude={longitude}
@@ -351,6 +362,14 @@ export function CreateEventForm({ organizationId, organizationName, organization
                       setLatitude(lat)
                       setLongitude(lng)
                     }}
+                    organizationId={organizationId || selectedOrgId}
+                    onLocationSelect={(location, lat, lng) => {
+                      // When user clicks a historical location on map, update both location text and coordinates
+                      setFormData((prev) => ({ ...prev, location }))
+                      setLatitude(lat)
+                      setLongitude(lng)
+                    }}
+                    searchKeyword={formData.location}
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
