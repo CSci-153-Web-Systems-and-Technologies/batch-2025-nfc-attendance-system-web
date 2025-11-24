@@ -63,6 +63,7 @@ export function AttendanceScanner({
   const [currentLng, setCurrentLng] = useState<number | null>(null)
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false)
   const [checkingLocation, setCheckingLocation] = useState(false)
+  const [distanceFromEvent, setDistanceFromEvent] = useState<number | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
 
@@ -81,6 +82,20 @@ export function AttendanceScanner({
     }
   }, [attendanceRadiusMeters, eventLatitude, eventLongitude])
 
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180
+    const R = 6371000 // Earth radius in meters
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
   const checkLocationPermission = async () => {
     setCheckingLocation(true)
     try {
@@ -95,6 +110,17 @@ export function AttendanceScanner({
       setCurrentLng(coords.coords.longitude)
       setLocationPermissionGranted(true)
       setGeoError(null)
+      
+      // Calculate distance from event location
+      if (eventLatitude != null && eventLongitude != null) {
+        const distance = calculateDistance(
+          coords.coords.latitude,
+          coords.coords.longitude,
+          eventLatitude,
+          eventLongitude
+        )
+        setDistanceFromEvent(distance)
+      }
     } catch (err: any) {
       setLocationPermissionGranted(false)
       if (err.code === 1) {
@@ -724,13 +750,25 @@ export function AttendanceScanner({
                 <p className="text-sm font-medium">Checking location access...</p>
               </div>
             ) : locationPermissionGranted ? (
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900">Location Access Granted</p>
-                  <p className="text-xs text-green-700 mt-1">
-                    This event requires attendance within {attendanceRadiusMeters}m of the event location.
-                  </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Location Access Granted</p>
+                    {distanceFromEvent != null && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Distance from event: <span className="font-semibold">{Math.round(distanceFromEvent)}m</span>
+                        {distanceFromEvent <= attendanceRadiusMeters! ? (
+                          <span className="text-green-600 ml-2">✓ Within range</span>
+                        ) : (
+                          <span className="text-red-600 ml-2">✗ Too far ({attendanceRadiusMeters}m required)</span>
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-green-700 mt-1">
+                      Required: Within {attendanceRadiusMeters}m of event location
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
