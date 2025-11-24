@@ -66,6 +66,9 @@ export default async function EventScannerPage({
           organizationId={organizationId}
           eventName={event.event_name}
           organizationName={event.organization.name}
+          eventLatitude={event.latitude ?? null}
+          eventLongitude={event.longitude ?? null}
+          attendanceRadiusMeters={event.attendance_radius_meters ?? null}
         />
       </div>
     </div>

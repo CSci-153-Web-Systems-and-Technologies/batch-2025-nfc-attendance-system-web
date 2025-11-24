@@ -24,6 +24,9 @@ interface AttendanceScannerProps {
   organizationId: string
   eventName: string
   organizationName: string
+  eventLatitude?: number | null
+  eventLongitude?: number | null
+  attendanceRadiusMeters?: number | null
 }
 
 interface ScannedUser {
@@ -52,6 +55,9 @@ export function AttendanceScanner({
   const [manualTagId, setManualTagId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [nfcSupported, setNfcSupported] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const [currentLat, setCurrentLat] = useState<number | null>(null)
+  const [currentLng, setCurrentLng] = useState<number | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
 
@@ -169,6 +175,37 @@ export function AttendanceScanner({
     if (isProcessing) return // Prevent duplicate processing
 
     setIsProcessing(true)
+
+    // If event has radius restriction, attempt to get current position first
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      try {
+        const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 0,
+          })
+        })
+        setCurrentLat(coords.coords.latitude)
+        setCurrentLng(coords.coords.longitude)
+        setGeoError(null)
+      } catch (err: any) {
+        setGeoError('Location permission denied or unavailable.')
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+            user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Cannot mark attendance without location (restricted event).'
+        })
+        setIsProcessing(false)
+        return
+      }
+    }
 
     // Basic tag format validation (UUID pattern)
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -349,8 +386,8 @@ export function AttendanceScanner({
             event_id: eventId,
             user_id: user.id,
             scan_method: method,
-            location_lat: null,
-            location_lng: null,
+            location_lat: attendanceRadiusMeters ? currentLat : null,
+            location_lng: attendanceRadiusMeters ? currentLng : null,
           }),
         })
       } catch (networkError: any) {
@@ -623,6 +660,12 @@ export function AttendanceScanner({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {attendanceRadiusMeters && (
+            <div className="mb-4 text-xs text-muted-foreground">
+              Geolocation restricted event: within {attendanceRadiusMeters}m of pinned location required.
+              {geoError && <p className="text-red-600 mt-1">{geoError}</p>}
+            </div>
+          )}
           {/* NFC Mode */}
           {scanMode === 'NFC' && (
             <div className="space-y-4">
