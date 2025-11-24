@@ -109,6 +109,9 @@ export async function POST(request: NextRequest) {
       organization_id: body.organization_id,
       description: body.description,
       location: body.location,
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
+      attendance_radius_meters: body.attendance_radius_meters ?? null,
       event_start: body.event_start,
       event_end: body.event_end,
     }
@@ -131,6 +134,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate event_start and event_end if provided
+        // Validate attendance_radius_meters if provided
+        if (input.attendance_radius_meters !== undefined && input.attendance_radius_meters !== null) {
+          if (
+            typeof input.attendance_radius_meters !== 'number' ||
+            input.attendance_radius_meters < 100 ||
+            input.attendance_radius_meters > 1000
+          ) {
+            return NextResponse.json(
+              { error: 'attendance_radius_meters must be between 100 and 1000' },
+              { status: 400 }
+            )
+          }
+          // Require latitude/longitude when radius restriction is set
+          if (input.latitude == null || input.longitude == null) {
+            return NextResponse.json(
+              { error: 'latitude and longitude are required when attendance radius is set' },
+              { status: 400 }
+            )
+          }
+        }
     if (input.event_start) {
       const eventStartObj = new Date(input.event_start)
       if (isNaN(eventStartObj.getTime())) {
