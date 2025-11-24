@@ -24,6 +24,9 @@ interface AttendanceScannerProps {
   organizationId: string
   eventName: string
   organizationName: string
+  eventLatitude?: number | null
+  eventLongitude?: number | null
+  attendanceRadiusMeters?: number | null
 }
 
 interface ScannedUser {
@@ -45,6 +48,9 @@ export function AttendanceScanner({
   organizationId,
   eventName,
   organizationName,
+  eventLatitude,
+  eventLongitude,
+  attendanceRadiusMeters,
 }: AttendanceScannerProps) {
   const [scanMode, setScanMode] = useState<ScanMode>('QR')
   const [isScanning, setIsScanning] = useState(false)
@@ -52,6 +58,12 @@ export function AttendanceScanner({
   const [manualTagId, setManualTagId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [nfcSupported, setNfcSupported] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const [currentLat, setCurrentLat] = useState<number | null>(null)
+  const [currentLng, setCurrentLng] = useState<number | null>(null)
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false)
+  const [checkingLocation, setCheckingLocation] = useState(false)
+  const [distanceFromEvent, setDistanceFromEvent] = useState<number | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
 
@@ -59,6 +71,71 @@ export function AttendanceScanner({
   useEffect(() => {
     setNfcSupported('NDEFReader' in window)
   }, [])
+
+  // Check and request location permission if radius restriction is active
+  useEffect(() => {
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      checkLocationPermission()
+    } else {
+      // No restriction, grant access
+      setLocationPermissionGranted(true)
+    }
+  }, [attendanceRadiusMeters, eventLatitude, eventLongitude])
+
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180
+    const R = 6371000 // Earth radius in meters
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const checkLocationPermission = async () => {
+    setCheckingLocation(true)
+    try {
+      const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        })
+      })
+      setCurrentLat(coords.coords.latitude)
+      setCurrentLng(coords.coords.longitude)
+      setLocationPermissionGranted(true)
+      setGeoError(null)
+      
+      // Calculate distance from event location
+      if (eventLatitude != null && eventLongitude != null) {
+        const distance = calculateDistance(
+          coords.coords.latitude,
+          coords.coords.longitude,
+          eventLatitude,
+          eventLongitude
+        )
+        setDistanceFromEvent(distance)
+      }
+    } catch (err: any) {
+      setLocationPermissionGranted(false)
+      if (err.code === 1) {
+        setGeoError('Location permission denied. Please enable location access to mark attendance for this event.')
+      } else if (err.code === 2) {
+        setGeoError('Location unavailable. Please check your device settings.')
+      } else if (err.code === 3) {
+        setGeoError('Location request timed out. Please try again.')
+      } else {
+        setGeoError('Cannot access location. Please enable location services.')
+      }
+    } finally {
+      setCheckingLocation(false)
+    }
+  }
 
   // Cleanup QR scanner on unmount or mode change
   useEffect(() => {
@@ -169,6 +246,56 @@ export function AttendanceScanner({
     if (isProcessing) return // Prevent duplicate processing
 
     setIsProcessing(true)
+
+    // If event has radius restriction, verify location permission is granted
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      if (!locationPermissionGranted || currentLat == null || currentLng == null) {
+        setGeoError('Location access required. Please enable location to mark attendance.')
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Cannot mark attendance without location (restricted event).'
+        })
+        setIsProcessing(false)
+        return
+      }
+      // Refresh location to get most current position
+      try {
+        const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 30000, // Use cached if less than 30 seconds old
+          })
+        })
+        setCurrentLat(coords.coords.latitude)
+        setCurrentLng(coords.coords.longitude)
+      } catch (err: any) {
+        // If refresh fails but we had previous coords, use those
+        if (currentLat == null || currentLng == null) {
+          setGeoError('Cannot get current location.')
+          addScannedUser({
+            id: '',
+            name: 'Error',
+            email: '',
+            user_type: '',
+            tag_id: tagId,
+            marked_at: new Date().toISOString(),
+            scan_method: method,
+            status: 'error',
+            message: 'Location unavailable. Please try again.'
+          })
+          setIsProcessing(false)
+          return
+        }
+      }
+    }
 
     // Basic tag format validation (UUID pattern)
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -349,8 +476,8 @@ export function AttendanceScanner({
             event_id: eventId,
             user_id: user.id,
             scan_method: method,
-            location_lat: null,
-            location_lng: null,
+            location_lat: attendanceRadiusMeters ? currentLat : null,
+            location_lng: attendanceRadiusMeters ? currentLng : null,
           }),
         })
       } catch (networkError: any) {
@@ -613,6 +740,64 @@ export function AttendanceScanner({
         </CardContent>
       </Card>
 
+      {/* Location Permission Banner */}
+      {attendanceRadiusMeters && eventLatitude != null && eventLongitude != null && (
+        <Card className={locationPermissionGranted ? 'border-green-200 bg-green-50/50' : 'border-amber-500 bg-amber-50'}>
+          <CardContent className="pt-6">
+            {checkingLocation ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <p className="text-sm font-medium">Checking location access...</p>
+              </div>
+            ) : locationPermissionGranted ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Location Access Granted</p>
+                    {distanceFromEvent != null && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Distance from event: <span className="font-semibold">{Math.round(distanceFromEvent)}m</span>
+                        {distanceFromEvent <= attendanceRadiusMeters! ? (
+                          <span className="text-green-600 ml-2">✓ Within range</span>
+                        ) : (
+                          <span className="text-red-600 ml-2">✗ Too far ({attendanceRadiusMeters}m required)</span>
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-green-700 mt-1">
+                      Required: Within {attendanceRadiusMeters}m of event location
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900">Location Access Required</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      This event restricts attendance to users within {attendanceRadiusMeters}m of the event location.
+                      You must enable location access to mark attendance.
+                    </p>
+                    {geoError && <p className="text-xs text-red-600 mt-2">{geoError}</p>}
+                  </div>
+                </div>
+                <Button
+                  onClick={checkLocationPermission}
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-amber-600 text-amber-900 hover:bg-amber-100"
+                >
+                  Enable Location Access
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Scanner Interface */}
       <Card>
         <CardHeader>
@@ -623,6 +808,14 @@ export function AttendanceScanner({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {!locationPermissionGranted && attendanceRadiusMeters && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm font-medium text-amber-900">⚠️ Scanner Disabled</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Please enable location access above to use the attendance scanner.
+              </p>
+            </div>
+          )}
           {/* NFC Mode */}
           {scanMode === 'NFC' && (
             <div className="space-y-4">
@@ -632,6 +825,7 @@ export function AttendanceScanner({
                     onClick={startNFCScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <Smartphone className="h-5 w-5" />
                     Start NFC Scan
@@ -677,6 +871,7 @@ export function AttendanceScanner({
                     onClick={startQRScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <QrCode className="h-5 w-5" />
                     Start QR Scan
@@ -721,7 +916,7 @@ export function AttendanceScanner({
               </div>
               <Button
                 type="submit"
-                disabled={!manualTagId.trim() || isProcessing}
+                disabled={!manualTagId.trim() || isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
                 className="w-full gap-2"
               >
                 {isProcessing ? (

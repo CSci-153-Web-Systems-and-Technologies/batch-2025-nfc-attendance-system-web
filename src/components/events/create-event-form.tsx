@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DateTimePicker } from '@/components/ui/datetime-picker'
-import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2, Clock } from 'lucide-react'
+import { Calendar, MapPin, FileText, ArrowLeft, Loader2, Building2, Clock, Crosshair, Ruler } from 'lucide-react'
+import { MapPicker } from '@/components/events/map-picker'
 import type { OrganizationWithRole } from '@/types/organization'
 
 interface CreateEventFormProps {
@@ -30,6 +31,13 @@ export function CreateEventForm({ organizationId, organizationName, organization
   
   const [eventDate, setEventDate] = useState<Date | undefined>(undefined)
   const [eventEnd, setEventEnd] = useState<Date | undefined>(undefined)
+
+  // Geolocation feature state
+  const [enableGeo, setEnableGeo] = useState(false)
+  const [restrictRadius, setRestrictRadius] = useState(false)
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [radius, setRadius] = useState<number>(250) // default 250m
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -107,6 +115,14 @@ export function CreateEventForm({ organizationId, organizationName, organization
         organization_id: targetOrgId,
         location: formData.location || null,
         description: formData.description || null,
+      }
+      // Geolocation fields
+      if (enableGeo) {
+        requestBody.latitude = latitude
+        requestBody.longitude = longitude
+      }
+      if (enableGeo && restrictRadius) {
+        requestBody.attendance_radius_meters = radius
       }
 
       // If event_end is provided, use eventDate as event_start
@@ -307,6 +323,91 @@ export function CreateEventForm({ organizationId, organizationName, organization
               <p className="text-xs text-muted-foreground">
                 {formData.location.length}/500 characters
               </p>
+            </div>
+
+            {/* Enable precise map location */}
+            <div className="space-y-2 border rounded-md p-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Crosshair className="h-4 w-4" /> Precise Map Location (Optional)
+                </Label>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={enableGeo}
+                  onChange={(e) => setEnableGeo(e.target.checked)}
+                  disabled={loading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Toggle to pin exact event location on a map.
+              </p>
+              {enableGeo && (
+                <div className="space-y-3">
+                  <MapPicker
+                    latitude={latitude}
+                    longitude={longitude}
+                    onChange={(lat, lng) => {
+                      setLatitude(lat)
+                      setLongitude(lng)
+                    }}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Latitude</Label>
+                      <Input
+                        value={latitude ?? ''}
+                        onChange={(e) => setLatitude(e.target.value ? parseFloat(e.target.value) : null)}
+                        placeholder="Latitude"
+                        type="number"
+                        step="0.000001"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Longitude</Label>
+                      <Input
+                        value={longitude ?? ''}
+                        onChange={(e) => setLongitude(e.target.value ? parseFloat(e.target.value) : null)}
+                        placeholder="Longitude"
+                        type="number"
+                        step="0.000001"
+                      />
+                    </div>
+                  </div>
+                  {/* Restrict radius */}
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Ruler className="h-4 w-4" /> Restrict Attendance Radius
+                      </Label>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={restrictRadius}
+                        onChange={(e) => setRestrictRadius(e.target.checked)}
+                        disabled={loading || latitude == null || longitude == null}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Only allow attendance marking within selected distance.
+                    </p>
+                    {restrictRadius && (
+                      <div className="space-y-1">
+                        <input
+                          type="range"
+                          min={100}
+                          max={1000}
+                          step={50}
+                          value={radius}
+                          onChange={(e) => setRadius(parseInt(e.target.value))}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">Radius: {radius} meters</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Description */}

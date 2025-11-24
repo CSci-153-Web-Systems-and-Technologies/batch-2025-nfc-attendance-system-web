@@ -298,6 +298,60 @@ time curl -X POST https://your-app.vercel.app/api/user/tag/confirm \
 
 ## Edge Cases
 
+---
+
+## Geolocation & Attendance Radius Tests (Nov 24, 2025)
+
+### Test G1: Create Event With Geolocation Only
+1. Create event with map location pinned (lat/long) but no radius.
+2. Mark attendance from two different physical locations.
+Expected: Both succeed (no restriction).
+
+### Test G2: Create Event With 250m Radius
+1. Create event with pinned location and radius slider at 250m.
+2. Mark attendance within ~50m.
+3. Move >300m away (simulate by editing client coordinates in dev tools) and attempt again.
+Expected: First succeeds, second fails with outside radius message.
+
+### Test G3: Boundary Distance
+1. Event radius 250m.
+2. Simulate coordinates exactly at calculated boundary (use haversine calculator).
+Expected: Attendance allowed (<= comparison).
+
+### Test G4: Geolocation Permission Denied
+1. Event radius enabled.
+2. In browser: Block location access.
+3. Attempt scan.
+Expected: Error: Cannot mark attendance without location (restricted event).
+
+### Test G5: Missing Lat/Long With Radius (API Validation)
+1. POST /api/event with attendance_radius_meters set but no latitude/longitude.
+Expected: 400 error: latitude and longitude are required when attendance radius is set.
+
+### Test G6: Invalid Radius Values
+1. Try values 50 and 1500.
+Expected: 400 validation error.
+
+### Test G7: Update Event Radius
+1. Create event with radius 250m.
+2. Update event to 500m (ensure update API flow tested when implemented).
+3. Attempt attendance beyond 250m but within 500m afterward.
+Expected: Now succeeds after update.
+
+### Test G8: High Accuracy vs. Approximate
+1. Compare marking with enableHighAccuracy true vs false (manually modify code for experiment).
+Expected: Both function; potential minor distance variance (<30m).
+
+### Test G9: Fallback Without Geolocation Data
+1. Temporarily remove geolocation block in AttendanceScanner.
+2. Attempt marking without sending location coords while radius configured.
+Expected: Server error: Location required.
+
+### Test G10: Performance Under Radius
+1. Mark 20 consecutive attendances inside radius.
+Expected: No noticeable latency increase from distance calculation.
+
+
 ### Edge Case 1: Double Confirmation
 **Test:** Try to confirm the same pending_id twice
 

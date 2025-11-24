@@ -7,6 +7,9 @@ export interface Event {
   organization_id: string
   description: string | null
   location: string | null
+  latitude?: number | null
+  longitude?: number | null
+  attendance_radius_meters?: number | null
   created_by: string
   created_at: string
   updated_at: string
@@ -40,6 +43,9 @@ export interface CreateEventInput {
   organization_id: string
   description?: string
   location?: string
+  latitude?: number | null
+  longitude?: number | null
+  attendance_radius_meters?: number | null
   event_start?: string
   event_end?: string
 }
@@ -49,6 +55,9 @@ export interface UpdateEventInput {
   date?: string
   description?: string
   location?: string
+  latitude?: number | null
+  longitude?: number | null
+  attendance_radius_meters?: number | null
   event_start?: string
   event_end?: string
 }

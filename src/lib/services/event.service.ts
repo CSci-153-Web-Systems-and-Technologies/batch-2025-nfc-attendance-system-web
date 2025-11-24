@@ -101,6 +101,9 @@ export class EventService {
         organization_id: input.organization_id,
         description: input.description || null,
         location: input.location || null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        attendance_radius_meters: input.attendance_radius_meters ?? null,
         event_start: input.event_start || null,
         event_end: input.event_end || null,
         created_by: userId,
@@ -383,6 +386,10 @@ export class EventService {
     if (input.description !== undefined)
       updateData.description = input.description
     if (input.location !== undefined) updateData.location = input.location
+    if (input.latitude !== undefined) updateData.latitude = input.latitude
+    if (input.longitude !== undefined) updateData.longitude = input.longitude
+    if (input.attendance_radius_meters !== undefined)
+      updateData.attendance_radius_meters = input.attendance_radius_meters
     if (input.event_start !== undefined) updateData.event_start = input.event_start
     if (input.event_end !== undefined) updateData.event_end = input.event_end
 
