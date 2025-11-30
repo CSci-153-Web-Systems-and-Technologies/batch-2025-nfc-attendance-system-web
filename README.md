@@ -70,6 +70,18 @@ Four hierarchical roles with specific permissions:
 - **QR Code Generation** - Automatic QR code creation for each tag
 - **NFC Tag Writing** - Direct Web NFC API integration (Android Chrome)
 
+### 📎 File Upload System
+- **Event Attachments** - Upload documents and images to events
+- **Featured Images** - Event posters displayed prominently (recommended 16:9, 1200x675px)
+- **Multiple File Types** - Support for PDF, Word (.doc/.docx), JPG, PNG
+- **File Limits** - Max 10 files per event, 20MB per file
+- **Attendee-Only Access** - Files visible only to users who attended the event
+- **File Management** - Add/delete files anytime during event editing
+- **Individual Validation** - Per-file error messages for type/size violations
+- **Automatic Cleanup** - Files deleted 3 days after event ends (grace period)
+- **Admin Control** - Organization owners/admins can trigger manual cleanup via API
+- **Storage Integration** - Files stored in Supabase Storage with RLS policies
+
 ### 🎨 User Interface
 - **Modern Design** - Built with Tailwind CSS 4 and shadcn/ui components
 - **Dark Mode** - Full dark/light theme support with persistence
@@ -661,10 +673,9 @@ For questions or issues:
 - Role-based access control
 - Event creation with attendance windows
 - Multi-method attendance tracking (NFC, QR, Manual)
-- Unified tag system with rotation
-- Two-phase commit tag writing
-- Dark mode support
-- Real-time attendance updates
+- Event file upload system with attendee-only access
+- Featured images for events (event posters)
+- Automatic file cleanup (3-day grace period)
 
 ### Future Enhancements 🚀
 - Analytics dashboard with charts
@@ -675,6 +686,13 @@ For questions or issues:
 - Advanced reporting and analytics
 - Event templates
 - Recurring events
+- **File Upload Improvements**:
+   - Magic byte validation for enhanced security
+   - Organization-level storage quotas
+   - Concurrent file edit conflict resolution
+   - File version history
+   - Bulk file operations
+- Map preview on event detail pages
 
 ---
 
