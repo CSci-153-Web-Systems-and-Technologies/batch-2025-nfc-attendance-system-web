@@ -84,6 +84,13 @@ location         | text                    | YES      | null             | 6
 created_by       | uuid                    | NO       | null             | 7
 created_at       | timestamp with timezone | NO       | now()            | 8
 updated_at       | timestamp with timezone | NO       | now()            | 9
+event_start      | timestamp with timezone | YES      | null             | 10
+event_end        | timestamp with timezone | YES      | null             | 11
+
+NOTE: event_start and event_end define the attendance window (when attendance can be taken).
+      Both are nullable - if null, the event is reminder-only with no attendance tracking.
+      When set, attendance can only be marked between event_start and event_end.
+      The 'date' field remains as the event's scheduled date/time.
 */
 
 -- TABLE: organization_join_requests
@@ -501,6 +508,46 @@ SELECT om.id,
 FROM (organization_members om
     JOIN users u ON ((om.user_id = u.id)));
 */
+
+-- FUNCTION: confirm_tag_update
+-- Description: Updates tag ID and records write history if cooldown period has elapsed
+CREATE OR REPLACE FUNCTION confirm_tag_update(p_user_id UUID, p_tag_id TEXT)
+RETURNS JSON AS $$
+DECLARE
+    v_can_write_result JSON;
+    v_can_write BOOLEAN;
+    v_write_record_id UUID;
+BEGIN
+    -- Check if user can write a new tag
+    v_can_write_result := can_user_write_tag(p_user_id);
+    v_can_write := (v_can_write_result->>'can_write')::BOOLEAN;
+    
+    IF NOT v_can_write THEN
+        RAISE EXCEPTION 'Cannot write tag. Cooldown period not elapsed. Next available: %', 
+            v_can_write_result->>'next_available_date';
+    END IF;
+    
+    -- Update user's tag_id
+    UPDATE users 
+    SET tag_id = p_tag_id,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    -- Record the tag write in history
+    INSERT INTO user_tag_writes (user_id, tag_id, written_at)
+    VALUES (p_user_id, p_tag_id, NOW())
+    RETURNING id INTO v_write_record_id;
+    
+    RETURN json_build_object(
+        'success', TRUE,
+        'tag_id', p_tag_id,
+        'write_record_id', v_write_record_id,
+        'written_at', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION confirm_tag_update IS 'Updates tag ID and records write history if cooldown period has elapsed';
 
 -- ============================================================================
 -- SUMMARY
