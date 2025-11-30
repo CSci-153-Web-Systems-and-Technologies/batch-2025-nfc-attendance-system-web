@@ -195,26 +195,26 @@ export default function DashboardPage() {
             {/* On Going Events */}
             <section>
               <div className="flex items-center gap-2 mb-4">
-                <Info className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-gray-800">Currently Happening</h2>
+                <Info className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">Currently Happening</h2>
               </div>
               {loading ? (
-                <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
-                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                <div className="bg-muted rounded-xl p-8 border border-border">
+                  <div className="text-center text-sm text-muted-foreground">Loading events…</div>
                 </div>
               ) : error ? (
-                <div className="bg-red-50 rounded-xl p-8 border border-red-200">
-                  <div className="text-center text-sm text-red-600">{error}</div>
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-8 border border-red-200 dark:border-red-800">
+                  <div className="text-center text-sm text-red-600 dark:text-red-400">{error}</div>
                 </div>
               ) : onGoing.length === 0 ? (
-                <Card className="bg-white shadow-md">
+                <Card className="bg-card shadow-md">
                   <CardContent className="py-12">
                     <div className="text-center">
-                      <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-800 mb-2">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
                         No events currently happening
                       </h3>
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         Events will appear here when they are in progress.
                       </p>
                     </div>
@@ -238,22 +238,22 @@ export default function DashboardPage() {
             {/* Upcoming Events */}
             <section>
               <div className="flex items-center gap-2 mb-4">
-                <Info className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-gray-800">Upcoming Events</h2>
+                <Info className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
               </div>
               {loading ? (
-                <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
-                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                <div className="bg-muted rounded-xl p-8 border border-border">
+                  <div className="text-center text-sm text-muted-foreground">Loading events…</div>
                 </div>
               ) : upcoming.length === 0 ? (
-                <Card className="bg-white shadow-md">
+                <Card className="bg-card shadow-md">
                   <CardContent className="py-12">
                     <div className="text-center">
-                      <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-800 mb-2">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
                         No upcoming events
                       </h3>
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         Check back later for new events.
                       </p>
                     </div>
@@ -277,22 +277,22 @@ export default function DashboardPage() {
             {/* Finished Events */}
             <section>
               <div className="flex items-center gap-2 mb-4">
-                <Info className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-gray-800">Past Events</h2>
+                <Info className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">Past Events</h2>
               </div>
               {loading ? (
-                <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
-                  <div className="text-center text-sm text-gray-600">Loading events…</div>
+                <div className="bg-muted rounded-xl p-8 border border-border">
+                  <div className="text-center text-sm text-muted-foreground">Loading events…</div>
                 </div>
               ) : finished.length === 0 ? (
-                <Card className="bg-white shadow-md">
+                <Card className="bg-card shadow-md">
                   <CardContent className="py-12">
                     <div className="text-center">
-                      <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-800 mb-2">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
                         No past events
                       </h3>
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         Your event history will appear here.
                       </p>
                     </div>

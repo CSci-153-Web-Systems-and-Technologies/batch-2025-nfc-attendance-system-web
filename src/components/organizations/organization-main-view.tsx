@@ -30,17 +30,17 @@ export function OrganizationMainView({ organizations }: OrganizationMainViewProp
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar - Organization List */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-4 sticky top-8">
+          <div className="bg-card rounded-lg shadow-md p-4 sticky top-8">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-gray-800">
+                <h2 className="text-lg font-semibold text-foreground">
                   My Organizations
                 </h2>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => router.push('/organizations/search')}
-                  className="h-8 w-8 text-violet-600 hover:bg-violet-100"
+                  className="h-8 w-8 text-primary hover:bg-accent"
                   title="Search Organizations"
                   aria-label="Search organizations"
                 >
@@ -49,7 +49,7 @@ export function OrganizationMainView({ organizations }: OrganizationMainViewProp
               </div>
               <button
                 onClick={() => setShowList(!showList)}
-                className="ml-auto lg:hidden text-violet-600 text-sm font-medium"
+                className="ml-auto lg:hidden text-primary text-sm font-medium"
               >
                 {showList ? 'Hide' : 'Show'}
               </button>

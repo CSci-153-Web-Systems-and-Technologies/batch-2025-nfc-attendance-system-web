@@ -81,11 +81,11 @@ export function MembersView({
   const getRoleIcon = (role: MembershipRole) => {
     switch (role) {
       case 'Owner':
-        return <Crown className="w-4 h-4 text-amber-600" />
+        return <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       case 'Admin':
-        return <Shield className="w-4 h-4 text-purple-600" />
+        return <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
       case 'Member':
-        return <User className="w-4 h-4 text-gray-600" />
+        return <User className="w-4 h-4 text-muted-foreground" />
     }
   }
 
@@ -93,11 +93,11 @@ export function MembersView({
   const getRoleColor = (role: MembershipRole) => {
     switch (role) {
       case 'Owner':
-        return 'bg-amber-100 text-amber-800 border-amber-200'
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
       case 'Admin':
-        return 'bg-purple-100 text-purple-800 border-purple-200'
+        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
       case 'Member':
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-foreground border-border'
     }
   }
 
@@ -256,53 +256,53 @@ export function MembersView({
           Back to Organizations
         </Button>
         <div className="flex items-center gap-3 mb-2">
-          <Users className="w-8 h-8 text-purple-600" />
-          <h1 className="text-3xl font-bold text-gray-900">Members</h1>
+          <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+          <h1 className="text-3xl font-bold text-foreground">Members</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Managing members for <span className="font-semibold">{organization.name}</span>
         </p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200" onClick={() => setSelectedRole('All')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">All Members</p>
-              <p className="text-2xl font-bold text-gray-900">{roleCount.All}</p>
+              <p className="text-sm text-muted-foreground">All Members</p>
+              <p className="text-2xl font-bold text-foreground">{roleCount.All}</p>
             </div>
-            <Users className="w-8 h-8 text-purple-600" />
+            <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-amber-200" onClick={() => setSelectedRole('Owner')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-amber-200 dark:hover:border-amber-800" onClick={() => setSelectedRole('Owner')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Owners</p>
-              <p className="text-2xl font-bold text-amber-600">{roleCount.Owner}</p>
+              <p className="text-sm text-muted-foreground">Owners</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{roleCount.Owner}</p>
             </div>
-            <Crown className="w-8 h-8 text-amber-600" />
+            <Crown className="w-8 h-8 text-amber-600 dark:text-amber-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200" onClick={() => setSelectedRole('Admin')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('Admin')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Admins</p>
-              <p className="text-2xl font-bold text-purple-600">{roleCount.Admin}</p>
+              <p className="text-sm text-muted-foreground">Admins</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{roleCount.Admin}</p>
             </div>
-            <Shield className="w-8 h-8 text-purple-600" />
+            <Shield className="w-8 h-8 text-purple-600 dark:text-purple-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-200" onClick={() => setSelectedRole('Member')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-border" onClick={() => setSelectedRole('Member')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Members</p>
-              <p className="text-2xl font-bold text-gray-600">{roleCount.Member}</p>
+              <p className="text-sm text-muted-foreground">Members</p>
+              <p className="text-2xl font-bold text-muted-foreground">{roleCount.Member}</p>
             </div>
-            <User className="w-8 h-8 text-gray-600" />
+            <User className="w-8 h-8 text-muted-foreground" />
           </div>
         </Card>
       </div>
@@ -311,7 +311,7 @@ export function MembersView({
       <Card className="p-6 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search by name or email..."
@@ -338,19 +338,19 @@ export function MembersView({
       {/* Members List */}
       {isRefreshing ? (
         <Card className="p-12 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading members...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading members...</p>
         </Card>
       ) : filteredMembers.length === 0 ? (
         <Card className="p-12 text-center">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No members found</h3>
-          <p className="text-gray-600">
+          <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-foreground mb-2">No members found</h3>
+          <p className="text-muted-foreground">
             {searchQuery || selectedRole !== 'All'
               ? 'Try adjusting your search or filter criteria.'
               : 'This organization has no members yet.'}
           </p>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             Debug: Total={total}, Members={members.length}, InitialMembers={initialMembers.length}
           </p>
         </Card>
@@ -361,14 +361,14 @@ export function MembersView({
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
                   {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
                     {member.user.name.charAt(0).toUpperCase()}
                   </div>
 
                   {/* Member Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {member.user.name}
                       </h3>
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getRoleColor(member.role)}`}>
@@ -378,11 +378,11 @@ export function MembersView({
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Mail className="w-4 h-4" />
                         <span>{member.user.email}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
                         <span>
                           Joined {new Date(member.joined_at).toLocaleDateString('en-US', {
@@ -393,9 +393,9 @@ export function MembersView({
                         </span>
                       </div>
                       {member.user.nfc_tag_id && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <UserCheck className="w-4 h-4" />
-                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
                             NFC: {member.user.nfc_tag_id}
                           </span>
                         </div>
@@ -449,13 +449,13 @@ export function MembersView({
           {/* Sentinel for infinite scroll */}
           <div ref={loadMoreRef} />
           {isLoadingMore && (
-            <Card className="p-4 text-center text-sm text-gray-600">Loading more...</Card>
+            <Card className="p-4 text-center text-sm text-muted-foreground">Loading more...</Card>
           )}
         </div>
       )}
 
       {/* Footer Info */}
-      <div className="mt-8 text-center text-sm text-gray-600">
+      <div className="mt-8 text-center text-sm text-muted-foreground">
         Showing {filteredMembers.length} of {total} members
       </div>
     </div>
