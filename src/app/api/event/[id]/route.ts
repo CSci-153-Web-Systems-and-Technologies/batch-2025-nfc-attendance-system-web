@@ -95,6 +95,9 @@ export async function PUT(
       location: body.location,
       event_start: body.event_start,
       event_end: body.event_end,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      attendance_radius_meters: body.attendance_radius_meters,
     }
 
     // Validate date format if provided

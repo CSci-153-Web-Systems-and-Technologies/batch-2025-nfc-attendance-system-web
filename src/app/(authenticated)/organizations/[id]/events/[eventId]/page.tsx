@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
-import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle } from 'lucide-react'
+import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle, Pencil } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -72,6 +72,15 @@ export default async function EventDetailPage({
     })
 
   const canTakeAttendance = !canTakeError && canTakeAttendanceResult === true
+
+  // Check if user can manage (edit/delete) this event
+  const { data: canManage, error: canManageError } = await supabase
+    .rpc('can_manage_event', {
+      p_event_id: eventId,
+      p_user_id: user.id,
+    })
+
+  const canManageEvent = !canManageError && canManage === true
 
   // Check if current user has attended
   const { data: hasAttended, error: attendedError } = await supabase
@@ -149,14 +158,24 @@ export default async function EventDetailPage({
                 {organization.name}
               </p>
             </div>
-            {canTakeAttendance && (
-              <Link href={`/organizations/${organizationId}/events/${eventId}/scanner`}>
-                <Button className="gap-2">
-                  <Users className="h-4 w-4" />
-                  Take Attendance
-                </Button>
-              </Link>
-            )}
+            <div className="flex items-center gap-3">
+              {canManageEvent && (
+                <Link href={`/organizations/${organizationId}/events/${eventId}/edit`}>
+                  <Button variant="outline" className="gap-2">
+                    <Pencil className="h-4 w-4" />
+                    Edit Event
+                  </Button>
+                </Link>
+              )}
+              {canTakeAttendance && (
+                <Link href={`/organizations/${organizationId}/events/${eventId}/scanner`}>
+                  <Button className="gap-2">
+                    <Users className="h-4 w-4" />
+                    Take Attendance
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
