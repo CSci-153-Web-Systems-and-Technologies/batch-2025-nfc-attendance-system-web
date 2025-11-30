@@ -59,21 +59,31 @@ COMMENT ON COLUMN events.featured_image_storage_path IS 'Storage path for featur
 
 -- ----------------------------------------------------------------------------
 -- RLS POLICIES FOR event_files TABLE
--- Restrict access based on event attendance
+-- Restrict access based on event attendance or admin role
 -- ----------------------------------------------------------------------------
 
 -- Enable RLS
 ALTER TABLE event_files ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view files for events they have attended
-CREATE POLICY event_files_select_attended_events ON event_files
+-- Policy: Users can view files if they attended OR are org owner/admin
+CREATE POLICY event_files_select_policy ON event_files
     FOR SELECT
     TO authenticated
     USING (
+        -- User attended the event
         EXISTS (
             SELECT 1 FROM event_attendance
             WHERE event_attendance.event_id = event_files.event_id
               AND event_attendance.user_id = auth.uid()
+        )
+        OR
+        -- User is org owner or admin (case-insensitive)
+        EXISTS (
+            SELECT 1 FROM events e
+            INNER JOIN organization_members om ON om.organization_id = e.organization_id
+            WHERE e.id = event_files.event_id
+              AND om.user_id = auth.uid()
+              AND LOWER(om.role) IN ('owner', 'admin')
         )
     );
 
@@ -87,7 +97,7 @@ CREATE POLICY event_files_insert_org_permissions ON event_files
             INNER JOIN organization_members om ON om.organization_id = e.organization_id
             WHERE e.id = event_files.event_id
               AND om.user_id = auth.uid()
-              AND om.role IN ('Owner', 'Admin', 'Attendance Taker')
+              AND LOWER(om.role) IN ('owner', 'admin', 'attendance taker')
         )
     );
 
@@ -106,17 +116,17 @@ CREATE POLICY event_files_delete_permissions ON event_files
               AND events.created_by = auth.uid()
         )
         OR
-        -- User is org admin/owner
+        -- User is org admin/owner (case-insensitive)
         EXISTS (
             SELECT 1 FROM events e
             INNER JOIN organization_members om ON om.organization_id = e.organization_id
             WHERE e.id = event_files.event_id
               AND om.user_id = auth.uid()
-              AND om.role IN ('Owner', 'Admin')
+              AND LOWER(om.role) IN ('owner', 'admin')
         )
     );
 
-COMMENT ON POLICY event_files_select_attended_events ON event_files IS 'Users can only view files for events they attended';
+COMMENT ON POLICY event_files_select_policy ON event_files IS 'Users can view files if they attended OR are org owner/admin';
 COMMENT ON POLICY event_files_insert_org_permissions ON event_files IS 'Only org admins/attendance takers can upload files';
 COMMENT ON POLICY event_files_delete_permissions ON event_files IS 'Uploaders, event creators, and org admins can delete files';
 
