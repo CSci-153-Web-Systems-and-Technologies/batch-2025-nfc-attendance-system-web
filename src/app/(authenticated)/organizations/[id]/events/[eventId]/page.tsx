@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
-import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle, Pencil } from 'lucide-react'
+import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle, Pencil, Download, Image as ImageIcon, FileIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -91,6 +91,15 @@ export default async function EventDetailPage({
 
   const userAttended = !attendedError && hasAttended === true
 
+  // Get event files
+  const { data: eventFiles } = await supabase
+    .from('event_files')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('uploaded_at', { ascending: false })
+
+  const files = eventFiles || []
+
   // Get event status
   const eventStatus = getEventStatus(event)
 
@@ -178,6 +187,19 @@ export default async function EventDetailPage({
             </div>
           </div>
         </div>
+
+          {/* Featured Image Hero */}
+          {event.featured_image_url && (
+            <div className="mb-6">
+              <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+                <img
+                  src={event.featured_image_url}
+                  alt={`${event.event_name} poster`}
+                  className="absolute top-0 left-0 w-full h-full object-cover rounded-lg shadow-md"
+                />
+              </div>
+            </div>
+          )}
 
         {/* Event Details Card */}
         <Card className="mb-6">
@@ -279,6 +301,74 @@ export default async function EventDetailPage({
             )}
           </CardContent>
         </Card>
+
+          {/* Event Files Card - Only visible to attendees */}
+          {userAttended && files.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Event Files</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {files.map((file) => {
+                    const isImage = file.file_type === 'image'
+                    const fileExtension = file.mime_type.split('/')[1].toUpperCase()
+                    const fileSizeFormatted = 
+                      file.file_size_bytes < 1024
+                        ? `${file.file_size_bytes} B`
+                        : file.file_size_bytes < 1024 * 1024
+                        ? `${(file.file_size_bytes / 1024).toFixed(1)} KB`
+                        : `${(file.file_size_bytes / 1024 / 1024).toFixed(1)} MB`
+
+                    return (
+                      <div
+                        key={file.id}
+                        className="flex items-center gap-3 p-4 bg-muted/50 rounded-md border border-input hover:border-primary/50 transition-colors"
+                      >
+                        {isImage ? (
+                          <div className="flex-shrink-0">
+                            <img
+                              src={file.file_url}
+                              alt={file.file_name}
+                              className="h-16 w-16 object-cover rounded border border-input"
+                            />
+                          </div>
+                        ) : (
+                          <FileIcon className="h-8 w-8 text-primary flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {file.file_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {fileSizeFormatted} • {fileExtension}
+                            {file.uploaded_at && (
+                              <> • Uploaded {new Date(file.uploaded_at).toLocaleDateString()}</>
+                            )}
+                          </p>
+                        </div>
+                        <a
+                          href={file.file_url}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0"
+                        >
+                          <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                            <Download className="h-4 w-4" />
+                            Download
+                          </button>
+                        </a>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-4 text-center">
+                  {files.length} file{files.length !== 1 ? 's' : ''} available for this event
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Attendance Statistics */}
         <div className="grid md:grid-cols-4 gap-4 mb-6">
