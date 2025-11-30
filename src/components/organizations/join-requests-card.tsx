@@ -108,16 +108,16 @@ export function JoinRequestsCard({ organizationId }: JoinRequestsCardProps) {
 
   if (loading) {
     return (
-      <Card className="bg-white shadow-md">
+      <Card className="bg-card shadow-md">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-600" />
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             Join Requests
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-gray-500 text-sm">Loading requests...</p>
+            <p className="text-muted-foreground text-sm">Loading requests...</p>
           </div>
         </CardContent>
       </Card>
@@ -125,15 +125,15 @@ export function JoinRequestsCard({ organizationId }: JoinRequestsCardProps) {
   }
 
   return (
-    <Card className="bg-white shadow-md">
+    <Card className="bg-card shadow-md">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-600" />
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             Join Requests
           </CardTitle>
           {requests.length > 0 && (
-            <span className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-semibold rounded-full">
+            <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-sm font-semibold rounded-full">
               {requests.length}
             </span>
           )}
@@ -142,28 +142,28 @@ export function JoinRequestsCard({ organizationId }: JoinRequestsCardProps) {
       <CardContent>
         {requests.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500 text-sm">No pending join requests</p>
+            <p className="text-muted-foreground text-sm">No pending join requests</p>
           </div>
         ) : (
           <div className="space-y-3">
             {requests.map((request) => (
               <div
                 key={request.id}
-                className="p-4 border-2 border-gray-200 rounded-lg hover:border-orange-300 transition-colors"
+                className="p-4 border-2 border-border rounded-lg hover:border-orange-300 dark:hover:border-orange-700 transition-colors"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
-                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
-                      <User className="h-5 w-5 text-white" />
+                    <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
+                      <User className="h-5 w-5 text-primary-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-800 text-sm">
+                      <h4 className="font-medium text-foreground text-sm">
                         {request.user?.name || 'Unknown User'}
                       </h4>
-                      <p className="text-xs text-gray-500 mb-1">
+                      <p className="text-xs text-muted-foreground mb-1">
                         {request.user?.email}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         Requested {formatDate(request.created_at)}
                       </p>
                     </div>

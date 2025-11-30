@@ -165,7 +165,7 @@ export default async function EventDetailPage({
   const manualEntries = summary?.manual_entries || 0
 
   return (
-    <div className="min-h-screen bg-violet-50/30 py-8 px-4 md:px-8">
+    <div className="min-h-screen bg-muted/30 py-8 px-4 md:px-8">
       <div className="max-w-6xl mx-auto">
         {/* Header with Back Button */}
         <div className="mb-6">
@@ -178,26 +178,26 @@ export default async function EventDetailPage({
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
                   {event.event_name}
                 </h1>
                 {eventStatus === 'ongoing' && (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full">
+                  <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm font-semibold rounded-full">
                     Currently Happening
                   </span>
                 )}
                 {eventStatus === 'upcoming' && (
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-semibold rounded-full">
                     Upcoming
                   </span>
                 )}
                 {eventStatus === 'past' && (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-semibold rounded-full">
+                  <span className="px-3 py-1 bg-muted text-muted-foreground text-sm font-semibold rounded-full">
                     Past
                   </span>
                 )}
               </div>
-              <p className="text-gray-600 mt-1">
+              <p className="text-muted-foreground mt-1">
                 {organization.name}
               </p>
             </div>

@@ -669,10 +669,10 @@ export function AttendanceScanner({
             <ArrowLeft className="h-4 w-4" />
             Back to Event
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Take Attendance
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             {eventName} • {organizationName}
           </p>
         </div>
