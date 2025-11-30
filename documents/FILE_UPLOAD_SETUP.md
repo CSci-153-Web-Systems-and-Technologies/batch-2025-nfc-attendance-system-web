@@ -5,7 +5,7 @@
 The event file upload system has been fully implemented with the following features:
 - Featured image upload for events (event posters, 16:9 recommended)
 - Additional file uploads (PDF, Word, Images) - max 10 files per event
-- Attendee-only file access
+- Attendee-only file access (owners/admins can always view)
 - File management in create/edit forms
 - Automatic cleanup 3 days after event ends
 - Admin cleanup API endpoint
@@ -23,7 +23,7 @@ Execute the migration file in your Supabase SQL Editor:
 **What it does:**
 - Creates `event_files` table with metadata columns
 - Adds `featured_image_url` and `featured_image_storage_path` columns to `events` table
-- Sets up RLS policies for attendee-only access
+- Sets up RLS policies for attendee + admin/owner access
 - Creates `cleanup_expired_event_files()` function
 - Creates `get_event_file_count()` helper function
 
@@ -31,6 +31,35 @@ Execute the migration file in your Supabase SQL Editor:
 1. Go to Supabase Dashboard → SQL Editor
 2. Copy the entire migration file content
 3. Paste and run the SQL
+
+**Note:** If you've already run an older version of the migration, run this to fix the SELECT policy:
+```sql
+-- Drop the old restrictive policy
+DROP POLICY IF EXISTS event_files_select_attended_events ON event_files;
+DROP POLICY IF EXISTS event_files_select_policy ON event_files;
+
+-- Create new policy that allows attendees AND org owners/admins (case-insensitive)
+CREATE POLICY event_files_select_policy ON event_files
+    FOR SELECT
+    TO authenticated
+    USING (
+        -- User attended the event
+        EXISTS (
+            SELECT 1 FROM event_attendance
+            WHERE event_attendance.event_id = event_files.event_id
+              AND event_attendance.user_id = auth.uid()
+        )
+        OR
+        -- User is org owner or admin (case-insensitive for role matching)
+        EXISTS (
+            SELECT 1 FROM events e
+            INNER JOIN organization_members om ON om.organization_id = e.organization_id
+            WHERE e.id = event_files.event_id
+              AND om.user_id = auth.uid()
+              AND LOWER(om.role) IN ('owner', 'admin')
+        )
+    );
+```
 
 ---
 
@@ -42,62 +71,24 @@ Execute the migration file in your Supabase SQL Editor:
 1. Go to Supabase Dashboard → Storage
 2. Click "New bucket"
 3. Set name: `event-files`
-4. **Public bucket:** `false` (we use RLS)
+4. **Public bucket:** `true` (simplifies URL access; RLS on database controls visibility)
 5. **File size limit:** `20971520` bytes (20MB)
 6. Click "Create bucket"
 
----
-
-### 3. Configure Storage Bucket Settings
-
 **Allowed MIME Types:**
-After creating the bucket, configure allowed file types:
-
-1. Click on the `event-files` bucket
-2. Go to "Policies" tab
-3. Configure the bucket to accept these MIME types:
-   - `application/pdf`
-   - `application/msword`
-   - `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-   - `image/jpeg`
-   - `image/png`
-
-**File Size Limit:** 20MB (20971520 bytes)
+Configure the bucket to accept these MIME types:
+- `image/png, image/jpeg, application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document`
 
 ---
 
-### 4. Set Up Storage RLS Policies
+### 3. Configure Storage Policies
 
-Create these RLS policies for the `event-files` bucket:
+Since the bucket is public, files can be accessed via URL. The security is enforced at the database level:
+- `event_files` table has RLS policies that restrict which file records users can see
+- Only attendees OR org owners/admins can query file metadata
+- Regular members who haven't attended won't see file URLs in the UI
 
-#### Policy 1: SELECT (Read) - Attendees Only
-```sql
--- Allow users to view files for events they attended
-CREATE POLICY "event_files_storage_select"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'event-files'
-  AND EXISTS (
-    SELECT 1
-    FROM event_files ef
-    INNER JOIN event_attendance ea ON ea.event_id = ef.event_id
-    WHERE ef.storage_path = name
-      AND ea.user_id = auth.uid()
-  )
-);
-```
-
-#### Policy 2: INSERT - Org Admins/Attendance Takers
-```sql
--- Allow org admins and attendance takers to upload files
-CREATE POLICY "event_files_storage_insert"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'event-files'
-  AND (
-    -- Extract event_id from path: {org_id}/{event_id}/{filename}
+For additional storage-level security (optional), add these policies in Supabase → Storage → Policies:
     EXISTS (
       SELECT 1
       FROM events e
@@ -160,6 +151,7 @@ Set up a scheduled job using:
 curl -X POST https://your-domain.com/api/admin/cleanup-files \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
+
 
 **Recommended frequency:** Daily
 
