@@ -15,6 +15,8 @@ export interface Event {
   updated_at: string
   event_start: string | null
   event_end: string | null
+  featured_image_url?: string | null
+  featured_image_storage_path?: string | null
 }
 
 export interface EventWithOrganization extends Event {
@@ -67,4 +69,32 @@ export interface EventFilters {
   from_date?: string
   to_date?: string
   search?: string
+}
+
+// Event File types for file upload system
+
+export interface EventFile {
+  id: string
+  event_id: string
+  file_name: string
+  file_url: string
+  storage_path: string
+  file_type: 'document' | 'image'
+  file_size_bytes: number
+  mime_type: string
+  uploaded_by: string
+  uploaded_at: string
+}
+
+export interface EventFileWithUploader extends EventFile {
+  uploader: {
+    id: string
+    name: string
+    email: string
+  }
+}
+
+export interface FileUploadValidationError {
+  file: File
+  error: string
 }
