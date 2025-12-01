@@ -68,6 +68,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
               .from('event_attendance')
               .select(`
                 *,
+                is_member,
                 user:users!event_attendance_user_id_fkey(
                   id,
                   name,
@@ -122,6 +123,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
               .from('event_attendance')
               .select(`
                 *,
+                is_member,
                 user:users!event_attendance_user_id_fkey(
                   id,
                   name,
@@ -255,10 +257,15 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
             </div>
 
             {/* User Type Badge */}
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex sm:items-center sm:gap-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
                 {record.user.user_type}
               </span>
+              {record.is_member === false && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                  Guest
+                </span>
+              )}
             </div>
 
             {/* Scan Method Badge */}
