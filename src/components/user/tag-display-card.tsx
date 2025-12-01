@@ -96,7 +96,7 @@ export function TagDisplayCard({ tagId, userName }: TagDisplayCardProps) {
         {/* QR Code Display */}
         <div className="flex flex-col items-center gap-4">
           {qrDataUrl && (
-            <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="bg-card p-4 rounded-lg shadow-sm border border-border">
               <img
                 src={qrDataUrl}
                 alt="Your QR Code"

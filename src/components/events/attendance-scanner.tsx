@@ -24,6 +24,9 @@ interface AttendanceScannerProps {
   organizationId: string
   eventName: string
   organizationName: string
+  eventLatitude?: number | null
+  eventLongitude?: number | null
+  attendanceRadiusMeters?: number | null
 }
 
 interface ScannedUser {
@@ -45,6 +48,9 @@ export function AttendanceScanner({
   organizationId,
   eventName,
   organizationName,
+  eventLatitude,
+  eventLongitude,
+  attendanceRadiusMeters,
 }: AttendanceScannerProps) {
   const [scanMode, setScanMode] = useState<ScanMode>('QR')
   const [isScanning, setIsScanning] = useState(false)
@@ -52,6 +58,12 @@ export function AttendanceScanner({
   const [manualTagId, setManualTagId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [nfcSupported, setNfcSupported] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const [currentLat, setCurrentLat] = useState<number | null>(null)
+  const [currentLng, setCurrentLng] = useState<number | null>(null)
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false)
+  const [checkingLocation, setCheckingLocation] = useState(false)
+  const [distanceFromEvent, setDistanceFromEvent] = useState<number | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
 
@@ -59,6 +71,71 @@ export function AttendanceScanner({
   useEffect(() => {
     setNfcSupported('NDEFReader' in window)
   }, [])
+
+  // Check and request location permission if radius restriction is active
+  useEffect(() => {
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      checkLocationPermission()
+    } else {
+      // No restriction, grant access
+      setLocationPermissionGranted(true)
+    }
+  }, [attendanceRadiusMeters, eventLatitude, eventLongitude])
+
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180
+    const R = 6371000 // Earth radius in meters
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const checkLocationPermission = async () => {
+    setCheckingLocation(true)
+    try {
+      const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        })
+      })
+      setCurrentLat(coords.coords.latitude)
+      setCurrentLng(coords.coords.longitude)
+      setLocationPermissionGranted(true)
+      setGeoError(null)
+      
+      // Calculate distance from event location
+      if (eventLatitude != null && eventLongitude != null) {
+        const distance = calculateDistance(
+          coords.coords.latitude,
+          coords.coords.longitude,
+          eventLatitude,
+          eventLongitude
+        )
+        setDistanceFromEvent(distance)
+      }
+    } catch (err: any) {
+      setLocationPermissionGranted(false)
+      if (err.code === 1) {
+        setGeoError('Location permission denied. Please enable location access to mark attendance for this event.')
+      } else if (err.code === 2) {
+        setGeoError('Location unavailable. Please check your device settings.')
+      } else if (err.code === 3) {
+        setGeoError('Location request timed out. Please try again.')
+      } else {
+        setGeoError('Cannot access location. Please enable location services.')
+      }
+    } finally {
+      setCheckingLocation(false)
+    }
+  }
 
   // Cleanup QR scanner on unmount or mode change
   useEffect(() => {
@@ -170,72 +247,59 @@ export function AttendanceScanner({
 
     setIsProcessing(true)
 
-    try {
-      // Look up user by tag
-      const userResponse = await fetch(`/api/user/by-tag?tag_id=${encodeURIComponent(tagId)}`)
-
-      if (!userResponse.ok) {
+    // If event has radius restriction, verify location permission is granted
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      if (!locationPermissionGranted || currentLat == null || currentLng == null) {
+        setGeoError('Location access required. Please enable location to mark attendance.')
         addScannedUser({
           id: '',
-          name: 'Unknown',
+          name: 'Error',
           email: '',
           user_type: '',
           tag_id: tagId,
           marked_at: new Date().toISOString(),
           scan_method: method,
           status: 'error',
-          message: 'User not found with this tag',
+          message: 'Cannot mark attendance without location (restricted event).'
         })
         setIsProcessing(false)
         return
       }
-
-      const userData = await userResponse.json()
-      const user = userData.user
-
-      // Mark attendance
-      const attendanceResponse = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventId,
-          user_id: user.id,
-          scan_method: method,
-          location_lat: null,
-          location_lng: null,
-        }),
-      })
-
-      const attendanceData = await attendanceResponse.json()
-
-      if (!attendanceResponse.ok) {
-        const isDuplicate = attendanceData.error?.includes('already marked')
-        addScannedUser({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          user_type: user.user_type,
-          tag_id: tagId,
-          marked_at: new Date().toISOString(),
-          scan_method: method,
-          status: isDuplicate ? 'duplicate' : 'error',
-          message: attendanceData.error || 'Failed to mark attendance',
+      // Refresh location to get most current position
+      try {
+        const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 30000, // Use cached if less than 30 seconds old
+          })
         })
-      } else {
-        addScannedUser({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          user_type: user.user_type,
-          tag_id: tagId,
-          marked_at: attendanceData.attendance.marked_at,
-          scan_method: method,
-          status: 'success',
-          message: 'Attendance marked successfully',
-        })
+        setCurrentLat(coords.coords.latitude)
+        setCurrentLng(coords.coords.longitude)
+      } catch (err: any) {
+        // If refresh fails but we had previous coords, use those
+        if (currentLat == null || currentLng == null) {
+          setGeoError('Cannot get current location.')
+          addScannedUser({
+            id: '',
+            name: 'Error',
+            email: '',
+            user_type: '',
+            tag_id: tagId,
+            marked_at: new Date().toISOString(),
+            scan_method: method,
+            status: 'error',
+            message: 'Location unavailable. Please try again.'
+          })
+          setIsProcessing(false)
+          return
+        }
       }
-    } catch (error: any) {
-      console.error('Error processing tag:', error)
+    }
+
+    // Basic tag format validation (UUID pattern)
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!tagId || tagId.trim().length === 0) {
       addScannedUser({
         id: '',
         name: 'Error',
@@ -245,7 +309,282 @@ export function AttendanceScanner({
         marked_at: new Date().toISOString(),
         scan_method: method,
         status: 'error',
-        message: error.message || 'Failed to process tag',
+        message: 'Invalid tag: Tag ID is empty',
+      })
+      setIsProcessing(false)
+      return
+    }
+
+    if (!uuidPattern.test(tagId.trim())) {
+      addScannedUser({
+        id: '',
+        name: 'Error',
+        email: '',
+        user_type: '',
+        tag_id: tagId,
+        marked_at: new Date().toISOString(),
+        scan_method: method,
+        status: 'error',
+        message: 'Invalid tag format: Expected UUID format',
+      })
+      setIsProcessing(false)
+      return
+    }
+
+    try {
+      // STEP 1: Look up user by tag
+      let userResponse: Response
+      try {
+        userResponse = await fetch(`/api/user/by-tag?tag_id=${encodeURIComponent(tagId)}`)
+      } catch (networkError: any) {
+        console.error('Network error during user lookup:', networkError)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Network error: Unable to connect to server',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Handle HTTP error responses with specific messages
+      if (!userResponse.ok) {
+        let errorMessage = 'User not found with this tag'
+        
+        switch (userResponse.status) {
+          case 400:
+            errorMessage = 'Invalid request: Missing tag ID parameter'
+            break
+          case 401:
+            errorMessage = 'Unauthorized: Please log in again'
+            break
+          case 404:
+            errorMessage = 'No user assigned to this tag'
+            break
+          case 500:
+            errorMessage = 'Server error during user lookup'
+            break
+          default:
+            errorMessage = `User lookup failed (${userResponse.status})`
+        }
+
+        addScannedUser({
+          id: '',
+          name: 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: errorMessage,
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Parse and normalize user response
+      let rawUserData: any
+      try {
+        rawUserData = await userResponse.json()
+      } catch (parseError: any) {
+        console.error('Failed to parse user response:', parseError)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Malformed response from server',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Normalize response structure (handles both flat and nested formats)
+      const user = rawUserData.user ?? rawUserData
+
+      // Validate user object structure
+      if (!user || typeof user !== 'object') {
+        console.error('Invalid user data structure:', rawUserData)
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data structure',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Validate required user fields
+      if (!user.id || typeof user.id !== 'string') {
+        console.error('Missing or invalid user ID:', user)
+        addScannedUser({
+          id: '',
+          name: user.name || 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data: Missing user ID',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      if (!user.name || typeof user.name !== 'string') {
+        console.error('Missing or invalid user name:', user)
+        addScannedUser({
+          id: user.id,
+          name: 'Unknown',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Invalid user data: Missing user name',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // STEP 2: Mark attendance
+      let attendanceResponse: Response
+      try {
+        attendanceResponse = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventId,
+            user_id: user.id,
+            scan_method: method,
+            location_lat: attendanceRadiusMeters ? currentLat : null,
+            location_lng: attendanceRadiusMeters ? currentLng : null,
+          }),
+        })
+      } catch (networkError: any) {
+        console.error('Network error during attendance marking:', networkError)
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Network error: Unable to mark attendance',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Parse attendance response
+      let attendanceData: any
+      try {
+        attendanceData = await attendanceResponse.json()
+      } catch (parseError: any) {
+        console.error('Failed to parse attendance response:', parseError)
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Malformed attendance response',
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Handle attendance response based on status code
+      if (!attendanceResponse.ok) {
+        let errorMessage = 'Failed to mark attendance'
+        let status: 'error' | 'duplicate' = 'error'
+
+        switch (attendanceResponse.status) {
+          case 400:
+            errorMessage = attendanceData.error || 'Invalid attendance request'
+            break
+          case 401:
+            errorMessage = 'Unauthorized: Please log in again'
+            break
+          case 403:
+            errorMessage = 'Permission denied: You cannot mark attendance for this event'
+            break
+          case 404:
+            errorMessage = 'Event not found'
+            break
+          case 409:
+            errorMessage = 'Attendance already marked for this event'
+            status = 'duplicate'
+            break
+          case 500:
+            errorMessage = attendanceData.error || 'Server error while marking attendance'
+            break
+          default:
+            errorMessage = attendanceData.error || `Attendance failed (${attendanceResponse.status})`
+        }
+
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: status,
+          message: errorMessage,
+        })
+      } else {
+        // Success case
+        addScannedUser({
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          user_type: user.user_type || '',
+          tag_id: tagId,
+          marked_at: attendanceData.attendance?.marked_at || new Date().toISOString(),
+          scan_method: method,
+          status: 'success',
+          message: 'Attendance marked successfully',
+        })
+      }
+    } catch (error: any) {
+      // Catch-all for unexpected errors
+      console.error('Unexpected error processing tag:', error)
+      addScannedUser({
+        id: '',
+        name: 'Error',
+        email: '',
+        user_type: '',
+        tag_id: tagId,
+        marked_at: new Date().toISOString(),
+        scan_method: method,
+        status: 'error',
+        message: error.message || 'Unexpected error occurred',
       })
     } finally {
       setIsProcessing(false)
@@ -330,10 +669,10 @@ export function AttendanceScanner({
             <ArrowLeft className="h-4 w-4" />
             Back to Event
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Take Attendance
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             {eventName} • {organizationName}
           </p>
         </div>
@@ -401,6 +740,64 @@ export function AttendanceScanner({
         </CardContent>
       </Card>
 
+      {/* Location Permission Banner */}
+      {attendanceRadiusMeters && eventLatitude != null && eventLongitude != null && (
+        <Card className={locationPermissionGranted ? 'border-green-200 bg-green-50/50' : 'border-amber-500 bg-amber-50'}>
+          <CardContent className="pt-6">
+            {checkingLocation ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <p className="text-sm font-medium">Checking location access...</p>
+              </div>
+            ) : locationPermissionGranted ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Location Access Granted</p>
+                    {distanceFromEvent != null && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Distance from event: <span className="font-semibold">{Math.round(distanceFromEvent)}m</span>
+                        {distanceFromEvent <= attendanceRadiusMeters! ? (
+                          <span className="text-green-600 ml-2">✓ Within range</span>
+                        ) : (
+                          <span className="text-red-600 ml-2">✗ Too far ({attendanceRadiusMeters}m required)</span>
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-green-700 mt-1">
+                      Required: Within {attendanceRadiusMeters}m of event location
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900">Location Access Required</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      This event restricts attendance to users within {attendanceRadiusMeters}m of the event location.
+                      You must enable location access to mark attendance.
+                    </p>
+                    {geoError && <p className="text-xs text-red-600 mt-2">{geoError}</p>}
+                  </div>
+                </div>
+                <Button
+                  onClick={checkLocationPermission}
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-amber-600 text-amber-900 hover:bg-amber-100"
+                >
+                  Enable Location Access
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Scanner Interface */}
       <Card>
         <CardHeader>
@@ -411,6 +808,14 @@ export function AttendanceScanner({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {!locationPermissionGranted && attendanceRadiusMeters && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm font-medium text-amber-900">⚠️ Scanner Disabled</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Please enable location access above to use the attendance scanner.
+              </p>
+            </div>
+          )}
           {/* NFC Mode */}
           {scanMode === 'NFC' && (
             <div className="space-y-4">
@@ -420,6 +825,7 @@ export function AttendanceScanner({
                     onClick={startNFCScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <Smartphone className="h-5 w-5" />
                     Start NFC Scan
@@ -465,6 +871,7 @@ export function AttendanceScanner({
                     onClick={startQRScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <QrCode className="h-5 w-5" />
                     Start QR Scan
@@ -509,7 +916,7 @@ export function AttendanceScanner({
               </div>
               <Button
                 type="submit"
-                disabled={!manualTagId.trim() || isProcessing}
+                disabled={!manualTagId.trim() || isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
                 className="w-full gap-2"
               >
                 {isProcessing ? (

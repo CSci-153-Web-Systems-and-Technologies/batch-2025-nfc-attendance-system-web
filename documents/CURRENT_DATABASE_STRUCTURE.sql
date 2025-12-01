@@ -84,6 +84,13 @@ location         | text                    | YES      | null             | 6
 created_by       | uuid                    | NO       | null             | 7
 created_at       | timestamp with timezone | NO       | now()            | 8
 updated_at       | timestamp with timezone | NO       | now()            | 9
+event_start      | timestamp with timezone | YES      | null             | 10
+event_end        | timestamp with timezone | YES      | null             | 11
+
+NOTE: event_start and event_end define the attendance window (when attendance can be taken).
+      Both are nullable - if null, the event is reminder-only with no attendance tracking.
+      When set, attendance can only be marked between event_start and event_end.
+      The 'date' field remains as the event's scheduled date/time.
 */
 
 -- TABLE: organization_join_requests

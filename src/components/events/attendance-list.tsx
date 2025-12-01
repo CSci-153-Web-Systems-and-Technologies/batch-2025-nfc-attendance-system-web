@@ -31,7 +31,8 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
         }
 
         const data = await response.json()
-        setAttendanceRecords(data.attendance || [])
+        console.log('Fetched attendance data:', data)
+        setAttendanceRecords(data.attendees || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load attendance')
         console.error('Error fetching attendance:', err)
@@ -239,7 +240,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
         >
           <div className="flex items-center gap-4 flex-1">
             {/* User Avatar */}
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
               <User className="h-5 w-5 text-white" />
             </div>
 

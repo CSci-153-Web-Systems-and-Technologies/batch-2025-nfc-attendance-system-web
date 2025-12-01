@@ -279,7 +279,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
                         <User className="w-4 h-4" />
                         <span className="capitalize">{request.user.user_type}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
                         <span>
                           Requested {new Date(request.requested_at).toLocaleDateString('en-US', {
@@ -292,7 +292,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
                         </span>
                       </div>
                       {request.reviewed_at && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-4 h-4" />
                           <span>
                             Reviewed {new Date(request.reviewed_at).toLocaleDateString('en-US', {
@@ -348,7 +348,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
       )}
 
       {/* Footer Info */}
-      <div className="mt-8 text-center text-sm text-gray-600">
+      <div className="mt-8 text-center text-sm text-muted-foreground">
         Showing {filteredRequests.length} of {requests.length} requests
       </div>
     </div>
