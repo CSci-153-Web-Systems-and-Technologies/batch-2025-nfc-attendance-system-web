@@ -507,7 +507,7 @@ export default async function EventDetailPage({
             <CardTitle>Attendance Records</CardTitle>
           </CardHeader>
           <CardContent>
-            <AttendanceList eventId={eventId} organizationId={organizationId} />
+            <AttendanceList eventId={eventId} organizationId={organizationId} userRole={membership.role} />
           </CardContent>
         </Card>
       </div>
