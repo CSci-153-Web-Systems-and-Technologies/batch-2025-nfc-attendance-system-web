@@ -157,6 +157,7 @@ export class AttendanceService {
       location_lat: record.location_lat,
       location_lng: record.location_lng,
       notes: record.notes,
+      is_member: record.is_member ?? true,
       created_at: record.created_at,
       updated_at: record.updated_at,
       user: {

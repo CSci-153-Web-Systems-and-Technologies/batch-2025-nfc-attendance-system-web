@@ -22,6 +22,7 @@ export interface Attendance {
   location_lat: number | null;
   location_lng: number | null;
   notes: string | null;
+  is_member: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +74,7 @@ export interface MarkAttendanceResponse {
   success: boolean;
   attendance_id: string;
   marked_at: string;
+  is_member: boolean;
 }
 
 // ============================================================================
@@ -94,6 +96,8 @@ export interface EventAttendanceSummary {
   nfc_scans: number;
   qr_scans: number;
   manual_entries: number;
+  member_count: number;
+  non_member_count: number;
   last_attendance_marked: string | null;
 }
 
