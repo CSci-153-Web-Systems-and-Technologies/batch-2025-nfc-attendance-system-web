@@ -264,16 +264,19 @@ export default async function EventDetailPage({
                 </div>
               )}
 
-              {/* Map Preview - Only for Owner, Admin, and Attendance Taker */}
-              {event.latitude && event.longitude && 
-               ['owner', 'admin', 'attendance_taker'].includes(membership.role) && (
+              {/* Map Preview - Visible to all members, radius only for attendance takers */}
+              {event.latitude && event.longitude && (
                 <div className="md:col-span-2">
                   <p className="font-medium text-foreground mb-2">Event Location Map</p>
                   <MapPreviewWrapper
                     latitude={event.latitude}
                     longitude={event.longitude}
                     locationText={event.location}
-                    attendanceRadiusMeters={event.attendance_radius_meters}
+                    attendanceRadiusMeters={
+                      ['owner', 'admin', 'attendance_taker'].includes(membership.role)
+                        ? event.attendance_radius_meters
+                        : null
+                    }
                   />
                 </div>
               )}
