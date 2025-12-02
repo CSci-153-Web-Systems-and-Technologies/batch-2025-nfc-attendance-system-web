@@ -108,9 +108,6 @@ export class AttendanceService {
       if (error.message.includes('already marked')) {
         throw new Error('Attendance already marked for this user at this event');
       }
-      if (error.message.includes('not a member')) {
-        throw new Error('User is not a member of the organization');
-      }
       if (error.message.includes('does not have permission')) {
         throw new Error('You do not have permission to take attendance for this event');
       }
@@ -157,6 +154,7 @@ export class AttendanceService {
       location_lat: record.location_lat,
       location_lng: record.location_lng,
       notes: record.notes,
+      is_member: record.is_member ?? true, // Default to true for existing records
       created_at: record.created_at,
       updated_at: record.updated_at,
       user: {
