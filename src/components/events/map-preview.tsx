@@ -3,8 +3,9 @@
 import { MapContainer, TileLayer, Marker, Circle, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useState } from 'react'
 
 // Red marker icon for event location
 const eventMarkerIcon = L.icon({
@@ -30,10 +31,13 @@ export function MapPreview({
   locationText,
   attendanceRadiusMeters 
 }: MapPreviewProps) {
+  const [showRadius, setShowRadius] = useState(true)
   const center: [number, number] = [latitude, longitude]
   
   // Google Maps URL for directions
   const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
+  
+  const hasRadius = attendanceRadiusMeters && attendanceRadiusMeters > 0
 
   return (
     <div className="space-y-3">
@@ -66,8 +70,8 @@ export function MapPreview({
             </Popup>
           </Marker>
           
-          {/* Attendance radius circle */}
-          {attendanceRadiusMeters && attendanceRadiusMeters > 0 && (
+          {/* Attendance radius circle - toggleable */}
+          {hasRadius && showRadius && (
             <Circle
               center={center}
               radius={attendanceRadiusMeters}
@@ -82,18 +86,42 @@ export function MapPreview({
         </MapContainer>
       </div>
       
-      {/* Open in Google Maps button */}
-      <a 
-        href={googleMapsUrl} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="inline-block"
-      >
-        <Button variant="outline" size="sm" className="gap-2">
-          <ExternalLink className="h-4 w-4" />
-          Open in Google Maps
-        </Button>
-      </a>
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Open in Google Maps button */}
+        <a 
+          href={googleMapsUrl} 
+          target="_blank" 
+          rel="noopener noreferrer"
+        >
+          <Button variant="outline" size="sm" className="gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Open in Google Maps
+          </Button>
+        </a>
+        
+        {/* Toggle radius button - only show if radius exists */}
+        {hasRadius && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={() => setShowRadius(!showRadius)}
+          >
+            {showRadius ? (
+              <>
+                <EyeOff className="h-4 w-4" />
+                Hide Radius
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4" />
+                Show Radius
+              </>
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

@@ -273,7 +273,7 @@ export default async function EventDetailPage({
                     longitude={event.longitude}
                     locationText={event.location}
                     attendanceRadiusMeters={
-                      ['owner', 'admin', 'attendance_taker'].includes(membership.role)
+                      ['Owner', 'Admin', 'Attendance Taker'].includes(membership.role)
                         ? event.attendance_radius_meters
                         : null
                     }
