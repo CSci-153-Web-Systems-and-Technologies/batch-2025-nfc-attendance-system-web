@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   Loader2,
   User,
+  Search,
+  UserCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -39,9 +41,20 @@ interface ScannedUser {
   scan_method: ScanMethod
   status: 'success' | 'error' | 'duplicate'
   message?: string
+  is_member?: boolean
+}
+
+interface SearchedUser {
+  id: string
+  name: string
+  email: string
+  user_type: string
+  tag_id: string | null
+  is_member: boolean
 }
 
 type ScanMode = 'NFC' | 'QR' | 'Manual'
+type ManualEntryMode = 'tag' | 'search'
 
 export function AttendanceScanner({
   eventId,
@@ -64,8 +77,15 @@ export function AttendanceScanner({
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false)
   const [checkingLocation, setCheckingLocation] = useState(false)
   const [distanceFromEvent, setDistanceFromEvent] = useState<number | null>(null)
+  // Manual entry mode state
+  const [manualEntryMode, setManualEntryMode] = useState<ManualEntryMode>('search')
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchedUser[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<SearchedUser | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check NFC support on mount
   useEffect(() => {
@@ -600,6 +620,139 @@ export function AttendanceScanner({
     setManualTagId('')
   }
 
+  // Search for users by name or email
+  const searchUsers = async (query: string) => {
+    if (query.trim().length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(
+        `/api/user/search?q=${encodeURIComponent(query)}&limit=10&exclude_org_members=${organizationId}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.users || [])
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error('Error searching users:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Debounced search handler
+  const handleSearchChange = (value: string) => {
+    setUserSearchQuery(value)
+    setSelectedUser(null)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      searchUsers(value)
+    }, 300)
+  }
+
+  // Mark attendance for selected user (from search)
+  const handleMarkSelectedUser = async () => {
+    if (!selectedUser || isProcessing) return
+
+    setIsProcessing(true)
+
+    // If event has radius restriction, verify location
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      if (!locationPermissionGranted || currentLat == null || currentLng == null) {
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: new Date().toISOString(),
+          scan_method: 'Manual',
+          status: 'error',
+          message: 'Cannot mark attendance without location (restricted event).',
+          is_member: selectedUser.is_member
+        })
+        setIsProcessing(false)
+        return
+      }
+    }
+
+    try {
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          user_id: selectedUser.id,
+          scan_method: 'Manual',
+          location_lat: attendanceRadiusMeters ? currentLat : null,
+          location_lng: attendanceRadiusMeters ? currentLng : null,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        let status: 'error' | 'duplicate' = 'error'
+        if (response.status === 409) {
+          status = 'duplicate'
+        }
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: new Date().toISOString(),
+          scan_method: 'Manual',
+          status: status,
+          message: data.error || 'Failed to mark attendance',
+          is_member: selectedUser.is_member
+        })
+      } else {
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: data.attendance?.marked_at || new Date().toISOString(),
+          scan_method: 'Manual',
+          status: 'success',
+          message: selectedUser.is_member ? 'Attendance marked successfully' : 'Guest attendance marked',
+          is_member: selectedUser.is_member
+        })
+      }
+    } catch (error: any) {
+      addScannedUser({
+        id: selectedUser.id,
+        name: selectedUser.name,
+        email: selectedUser.email,
+        user_type: selectedUser.user_type,
+        tag_id: selectedUser.tag_id || '',
+        marked_at: new Date().toISOString(),
+        scan_method: 'Manual',
+        status: 'error',
+        message: error.message || 'Network error',
+        is_member: selectedUser.is_member
+      })
+    } finally {
+      setIsProcessing(false)
+      setSelectedUser(null)
+      setUserSearchQuery('')
+      setSearchResults([])
+    }
+  }
+
   // Add scanned user to the list
   const addScannedUser = (user: ScannedUser) => {
     setScannedUsers((prev) => [user, ...prev])
@@ -901,37 +1054,188 @@ export function AttendanceScanner({
 
           {/* Manual Mode */}
           {scanMode === 'Manual' && (
-            <form onSubmit={handleManualEntry} className="space-y-4">
-              <div>
-                <Label htmlFor="tag-id">Tag ID</Label>
-                <Input
-                  id="tag-id"
-                  type="text"
-                  placeholder="Enter or paste tag ID"
-                  value={manualTagId}
-                  onChange={(e) => setManualTagId(e.target.value)}
-                  disabled={isProcessing}
-                  className="mt-2"
-                />
+            <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  type="button"
+                  variant={manualEntryMode === 'search' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setManualEntryMode('search')}
+                  className="flex-1 gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Search User
+                </Button>
+                <Button
+                  type="button"
+                  variant={manualEntryMode === 'tag' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setManualEntryMode('tag')}
+                  className="flex-1 gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Enter Tag ID
+                </Button>
               </div>
-              <Button
-                type="submit"
-                disabled={!manualTagId.trim() || isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
-                className="w-full gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-5 w-5" />
-                    Mark Attendance
-                  </>
-                )}
-              </Button>
-            </form>
+
+              {/* User Search Mode */}
+              {manualEntryMode === 'search' && (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="user-search">Search by Name or Email</Label>
+                    <div className="relative mt-2">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="user-search"
+                        type="text"
+                        placeholder="Type at least 2 characters..."
+                        value={userSearchQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        disabled={isProcessing}
+                        className="pl-10"
+                      />
+                    </div>
+                    {isSearching && (
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 && !selectedUser && (
+                    <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => setSelectedUser(user)}
+                          className="w-full p-3 text-left hover:bg-muted/50 transition-colors flex items-center gap-3"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
+                            <User className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">{user.name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                              {user.user_type}
+                            </span>
+                            {!user.is_member && (
+                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                                Guest
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Selected User Confirmation */}
+                  {selectedUser && (
+                    <div className="border-2 border-primary rounded-lg p-4 bg-primary/5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
+                          <UserCheck className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground">{selectedUser.name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                          <div className="flex gap-2 mt-1">
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                              {selectedUser.user_type}
+                            </span>
+                            {!selectedUser.is_member && (
+                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                                Guest (Non-member)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedUser(null)
+                            setUserSearchQuery('')
+                          }}
+                          disabled={isProcessing}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleMarkSelectedUser}
+                          disabled={isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
+                          className="flex-1 gap-2"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Marking...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              Mark Attendance
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {userSearchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No users found matching "{userSearchQuery}"
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Tag ID Entry Mode */}
+              {manualEntryMode === 'tag' && (
+                <form onSubmit={handleManualEntry} className="space-y-4">
+                  <div>
+                    <Label htmlFor="tag-id">Tag ID</Label>
+                    <Input
+                      id="tag-id"
+                      type="text"
+                      placeholder="Enter or paste tag ID"
+                      value={manualTagId}
+                      onChange={(e) => setManualTagId(e.target.value)}
+                      disabled={isProcessing}
+                      className="mt-2"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={!manualTagId.trim() || isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
+                    className="w-full gap-2"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-5 w-5" />
+                        Mark Attendance
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -966,9 +1270,16 @@ export function AttendanceScanner({
                     <div className="flex items-center gap-3 flex-1">
                       {getStatusIcon(user.status)}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {user.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground truncate">
+                            {user.name}
+                          </p>
+                          {user.is_member === false && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                              Guest
+                            </span>
+                          )}
+                        </div>
                         {user.email && (
                           <p className="text-sm text-muted-foreground truncate">
                             {user.email}
