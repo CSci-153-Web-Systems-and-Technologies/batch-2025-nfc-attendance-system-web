@@ -5,11 +5,11 @@ import type { AttendanceWithUser } from '@/types/attendance'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ eventId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
-    const { eventId } = await params
+    const { id: eventId } = await params
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
