@@ -6,18 +6,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { AttendanceList } from '@/components/events/attendance-list'
 import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
-import dynamic from 'next/dynamic'
-
-// Dynamic import for MapPreview to avoid SSR issues with Leaflet
-const MapPreview = dynamic(
-  () => import('@/components/events/map-preview').then(mod => ({ default: mod.MapPreview })),
-  { 
-    ssr: false, 
-    loading: () => (
-      <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />
-    )
-  }
-)
+import { MapPreviewWrapper } from '@/components/events/map-preview-wrapper'
 
 export default async function EventDetailPage({
   params,
@@ -280,7 +269,7 @@ export default async function EventDetailPage({
                ['owner', 'admin', 'attendance_taker'].includes(membership.role) && (
                 <div className="md:col-span-2">
                   <p className="font-medium text-foreground mb-2">Event Location Map</p>
-                  <MapPreview
+                  <MapPreviewWrapper
                     latitude={event.latitude}
                     longitude={event.longitude}
                     locationText={event.location}
