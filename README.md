@@ -47,6 +47,7 @@ Four hierarchical roles with specific permissions:
 - **Event Details** - Rich information including venue, description (max 2000 chars)
 - **Event Validation** - Name length (3-200 chars), location (max 500 chars)
 - **Organization-Scoped** - Events belong to organizations
+- **Map Preview** - Interactive map showing event location with attendance radius (visible to Owners, Admins, Attendance Takers)
 
 ### 📊 Attendance Tracking
 - **Multiple Scan Methods**:
@@ -676,6 +677,7 @@ For questions or issues:
 - Event file upload system with attendee-only access
 - Featured images for events (event posters)
 - Automatic file cleanup (3-day grace period)
+- Map preview on event detail pages (for Owners, Admins, Attendance Takers)
 
 ### Future Enhancements 🚀
 - Analytics dashboard with charts
@@ -692,7 +694,6 @@ For questions or issues:
    - Concurrent file edit conflict resolution
    - File version history
    - Bulk file operations
-- Map preview on event detail pages
 
 ---
 
