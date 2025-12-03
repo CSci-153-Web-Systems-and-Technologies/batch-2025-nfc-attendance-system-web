@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Info, Plus, Calendar, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Calendar, X, Sparkles, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useUserProfile } from '@/hooks/use-user-profile'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { EventCard } from '@/components/events/event-card'
@@ -33,8 +34,38 @@ const formatDateKey = (date: Date): string => {
 // Event status type for calendar dots
 type EventStatus = 'ongoing' | 'upcoming' | 'past'
 
+// Get time-based greeting
+const getGreeting = (): string => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+// Format event date for display in banner
+const formatEventDate = (dateString: string): string => {
+  const eventDate = new Date(dateString)
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  // Check if it's today
+  if (eventDate.toDateString() === today.toDateString()) {
+    return `today at ${eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+  
+  // Check if it's tomorrow
+  if (eventDate.toDateString() === tomorrow.toDateString()) {
+    return `tomorrow at ${eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+  
+  // Otherwise show full date
+  return eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 export default function DashboardPage() {
   const router = useRouter()
+  const { user, loading: userLoading } = useUserProfile()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [onGoing, setOnGoing] = useState<DashboardEvent[]>([])
@@ -44,6 +75,9 @@ export default function DashboardPage() {
   // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  
+  // Get first name for greeting
+  const firstName = user?.name?.split(' ')[0] || 'there'
 
   // Fetch events for dashboard
   useEffect(() => {
@@ -186,6 +220,72 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Welcome Banner */}
+        <Card className="mb-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20 overflow-hidden">
+          <CardContent className="py-4 relative">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                {/* Greeting */}
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    {getGreeting()}, {userLoading ? (
+                      <span className="inline-block w-24 h-5 bg-muted animate-pulse rounded" />
+                    ) : (
+                      <span>{firstName}!</span>
+                    )} 👋
+                  </h2>
+                </div>
+                
+                {/* Dynamic Event Status Message */}
+                <div className="text-sm text-muted-foreground">
+                  {loading ? (
+                    <span className="inline-block w-48 h-4 bg-muted animate-pulse rounded" />
+                  ) : onGoing.length > 0 ? (
+                    <button
+                      onClick={() => router.push(`/organizations/${onGoing[0].organization_id}/events/${onGoing[0].id}`)}
+                      className="flex items-center gap-2 hover:text-foreground transition-colors group"
+                    >
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      <span>
+                        <span className="font-medium text-green-600 dark:text-green-400">Live now:</span>{' '}
+                        <span className="group-hover:underline">{onGoing[0].event_name}</span>
+                        {onGoing.length > 1 && (
+                          <span className="text-muted-foreground"> +{onGoing.length - 1} more</span>
+                        )}
+                      </span>
+                    </button>
+                  ) : upcoming.length > 0 ? (
+                    <button
+                      onClick={() => router.push(`/organizations/${upcoming[0].organization_id}/events/${upcoming[0].id}`)}
+                      className="flex items-center gap-2 hover:text-foreground transition-colors group"
+                    >
+                      <Clock className="h-3.5 w-3.5 text-blue-500" />
+                      <span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">Next up:</span>{' '}
+                        <span className="group-hover:underline">{upcoming[0].event_name}</span>{' '}
+                        <span className="text-muted-foreground">• {formatEventDate(upcoming[0].date)}</span>
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span>No upcoming events — enjoy your free time!</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Decorative element */}
+              <div className="hidden sm:block absolute right-4 top-1/2 -translate-y-1/2 opacity-10">
+                <Calendar className="h-20 w-20 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Date Filter Indicator */}
         {selectedDate && (
@@ -471,9 +571,8 @@ export default function DashboardPage() {
                         aspect-square flex flex-col items-center justify-center text-sm rounded-lg relative
                         transition-all duration-200
                         ${day === null ? '' : hasEvents ? 'cursor-pointer hover:bg-accent hover:text-accent-foreground' : 'text-foreground'}
-                        ${isToday && !isSelected ? 'bg-primary text-primary-foreground font-semibold' : ''}
-                        ${isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-card bg-primary/10' : ''}
-                        ${day && !isToday && !isSelected ? '' : ''}
+                        ${day && isToday && !isSelected ? 'bg-primary text-primary-foreground font-semibold' : ''}
+                        ${day && isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-card bg-primary/10' : ''}
                       `}
                     >
                       <span className={isSelected ? 'font-semibold text-primary' : ''}>{day}</span>
