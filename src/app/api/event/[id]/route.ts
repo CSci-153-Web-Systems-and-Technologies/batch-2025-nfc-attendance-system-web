@@ -86,7 +86,26 @@ export async function PUT(
     }
 
     const { id } = await params
-    const body = await request.json()
+
+    // Check if request contains files (multipart/form-data) or just JSON
+    const contentType = request.headers.get('content-type') || ''
+    const isMultipart = contentType.includes('multipart/form-data')
+
+    let body: any
+    let newFeaturedImage: File | null = null
+    let removeFeaturedImage = false
+
+    if (isMultipart) {
+      const formData = await request.formData()
+      body = JSON.parse(formData.get('data') as string)
+      const featuredImageFile = formData.get('featuredImage')
+      if (featuredImageFile instanceof File) {
+        newFeaturedImage = featuredImageFile
+      }
+      removeFeaturedImage = formData.get('removeFeaturedImage') === 'true'
+    } else {
+      body = await request.json()
+    }
 
     const input: UpdateEventInput = {
       event_name: body.event_name,
@@ -95,6 +114,9 @@ export async function PUT(
       location: body.location,
       event_start: body.event_start,
       event_end: body.event_end,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      attendance_radius_meters: body.attendance_radius_meters,
     }
 
     // Validate date format if provided
@@ -130,6 +152,24 @@ export async function PUT(
       }
     }
 
+    // Validate new featured image if provided
+    if (newFeaturedImage) {
+      const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
+      if (newFeaturedImage.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `Featured image size ${(newFeaturedImage.size / 1024 / 1024).toFixed(2)}MB exceeds 20MB limit` },
+          { status: 400 }
+        )
+      }
+      if (!['image/jpeg', 'image/png'].includes(newFeaturedImage.type)) {
+        return NextResponse.json(
+          { error: 'Featured image must be JPEG or PNG' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Update event
     const event = await EventService.updateEvent(user.id, id, input)
 
     if (!event) {
@@ -137,6 +177,60 @@ export async function PUT(
         { error: 'Failed to update event. Check permissions or event existence.' },
         { status: 403 }
       )
+    }
+
+    // Handle featured image update
+    if (removeFeaturedImage || newFeaturedImage) {
+      // Get current event to access old featured image path
+      const { data: currentEvent } = await supabase
+        .from('events')
+        .select('featured_image_storage_path, organization_id')
+        .eq('id', id)
+        .single()
+
+      // Delete old featured image from storage if exists
+      if (currentEvent?.featured_image_storage_path) {
+        await supabase.storage
+          .from('event-files')
+          .remove([currentEvent.featured_image_storage_path])
+      }
+
+      if (removeFeaturedImage) {
+        // Just remove the featured image
+        await supabase
+          .from('events')
+          .update({
+            featured_image_url: null,
+            featured_image_storage_path: null,
+          })
+          .eq('id', id)
+      } else if (newFeaturedImage && currentEvent) {
+        // Upload new featured image
+        const timestamp = Date.now()
+        const sanitizedFileName = newFeaturedImage.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const storagePath = `${currentEvent.organization_id}/${id}/featured/${timestamp}-${sanitizedFileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('event-files')
+          .upload(storagePath, newFeaturedImage, {
+            contentType: newFeaturedImage.type,
+            upsert: false,
+          })
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('event-files')
+            .getPublicUrl(storagePath)
+
+          await supabase
+            .from('events')
+            .update({
+              featured_image_url: publicUrl,
+              featured_image_storage_path: storagePath,
+            })
+            .eq('id', id)
+        }
+      }
     }
 
     return NextResponse.json(event)

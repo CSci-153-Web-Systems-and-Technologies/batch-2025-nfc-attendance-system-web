@@ -17,6 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "NFC Attendance System",
   description: "Streamline your event attendance tracking with NFC technology",
+  icons: {
+    icon: "/favicon.jpg",
+    apple: "/favicon.jpg",
+  },
 };
 
 export default async function RootLayout({

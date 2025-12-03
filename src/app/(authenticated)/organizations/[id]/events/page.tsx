@@ -53,7 +53,7 @@ export default async function OrganizationEventsPage({
     .order('date', { ascending: false })
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-muted py-8 px-4">
       <EventsListView
         organizationId={organization.id}
         organizationName={organization.name}

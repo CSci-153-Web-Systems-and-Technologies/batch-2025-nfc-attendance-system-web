@@ -5,8 +5,8 @@
 The Attendance System provides comprehensive event attendance tracking with support for multiple scan methods (NFC, QR Code, Manual). It includes real-time updates, geolocation tracking, and detailed reporting capabilities.
 
 **Status:** ✅ Active  
-**Last Updated:** November 19, 2025  
-**Version:** 1.0.0
+**Last Updated:** December 2, 2025  
+**Version:** 1.1.0 (Guest Attendance Support)
 
 ---
 
@@ -39,6 +39,7 @@ Stores attendance records for organization events.
 | `location_lat` | DECIMAL(10, 8) | YES | NULL | Latitude where marked |
 | `location_lng` | DECIMAL(11, 8) | YES | NULL | Longitude where marked |
 | `notes` | TEXT | YES | NULL | Optional notes (max 1000 chars) |
+| `is_member` | BOOLEAN | NO | TRUE | Whether attendee was org member at time of attendance |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NO | NOW() | Record creation time |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NO | NOW() | Last update time |
 
@@ -119,6 +120,53 @@ Get all attendance records for an event.
   total_members: number;
   attendance_rate: number;
   attendees: AttendanceWithUser[];
+}
+```
+
+---
+
+### GET `/api/attendance/event/[id]/export`
+
+Export attendance records to Excel file.
+
+**Authentication:** Required (Admin or Owner role only)
+
+**Response:** Excel file download (.xlsx)
+
+**File Contents:**
+- **Summary Sheet:** Event info, attendance counts (total/members/guests), scan method breakdown
+- **Attendees Sheet:** No., Name, Email, User Type, Membership Status, Scan Method, Check-in Time
+
+**Filename Format:** `[EventName]_Attendance_[YYYY-MM-DD].xlsx`
+
+**Errors:**
+- `401` - Unauthorized
+- `403` - Not an Admin/Owner
+- `404` - Event not found
+
+---
+
+### GET `/api/user/search`
+
+Search for users (for manual attendance entry).
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `q`: string (required) - Search query (name or email)
+- `limit`: number (default: 10) - Max results
+- `exclude_org_members`: UUID (optional) - Exclude members of this org
+
+**Response:**
+```typescript
+{
+  users: Array<{
+    id: string;
+    name: string;
+    email: string;
+    user_type: string;
+    is_member?: boolean;  // If exclude_org_members provided
+  }>
 }
 ```
 
@@ -318,7 +366,7 @@ mark_attendance(
 **Validations:**
 - Prevents duplicate attendance
 - Verifies event exists
-- Verifies user is organization member
+- Auto-detects if user is organization member (does NOT require membership)
 - Verifies marker has Attendance Taker permission or higher
 
 **Returns:**
@@ -326,7 +374,8 @@ mark_attendance(
 {
   "success": true,
   "attendance_id": "uuid",
-  "marked_at": "timestamp"
+  "marked_at": "timestamp",
+  "is_member": true
 }
 ```
 
@@ -396,6 +445,7 @@ Summary statistics for each event's attendance.
 - `total_attended`, `total_members`
 - `attendance_percentage`
 - `nfc_scans`, `qr_scans`, `manual_entries`
+- `member_count`, `non_member_count` (guest attendance breakdown)
 - `last_attendance_marked`
 
 **Usage:**
@@ -508,6 +558,38 @@ if (hasAttended) {
 
 ---
 
+## Guest (Non-Member) Attendance
+
+As of December 2, 2025, the attendance system supports recording attendance for users who are not members of the organization hosting the event.
+
+### How It Works
+
+1. **Auto-Detection:** When marking attendance, the system automatically checks if the user is a member of the event's organization
+2. **is_member Flag:** The `is_member` field is set to `FALSE` for non-members (guests)
+3. **No Membership Required:** Any registered user can have their attendance recorded
+4. **Visual Indication:** Guests are displayed with an orange "Guest" badge in the UI
+
+### Manual Entry for Guests
+
+The attendance scanner's Manual Entry mode supports:
+- **Search Users:** Search all registered users by name/email
+- **Non-members Visible:** Shows both members and non-members with membership status indicator
+- **Quick Selection:** Select any user and mark their attendance
+
+### Guest Attendance Statistics
+
+The `event_attendance_summary` view includes:
+- `member_count`: Number of attendees who were org members
+- `non_member_count`: Number of attendees who were guests
+
+### Excel Export
+
+When exporting attendance to Excel:
+- The Summary sheet shows member vs guest counts
+- The Attendees sheet includes a "Membership Status" column (Member/Guest)
+
+---
+
 ## Scan Method Breakdown
 
 ### NFC (Near Field Communication)
@@ -533,7 +615,7 @@ if (hasAttended) {
 ## Security Considerations
 
 1. **Duplicate Prevention:** Unique constraint on (event_id, user_id)
-2. **Organization Membership:** Users must be org members to be marked
+2. **Guest Support:** Non-members can be marked with `is_member=false` flag
 3. **Permission Checks:** Only Attendance Takers+ can mark attendance
 4. **Immutable Audit Trail:** Attendance records track who marked, when, and how
 5. **Geolocation Tracking:** Optional location verification
@@ -552,10 +634,11 @@ if (hasAttended) {
 
 ## Future Enhancements
 
+- [x] ~~Export to CSV/Excel~~ → **Implemented as Excel export (Admin/Owner only)**
+- [x] ~~Guest/non-member attendance~~ → **Implemented with is_member flag**
 - [ ] Attendance time windows (only mark during event)
 - [ ] Geofencing validation
 - [ ] Batch attendance marking
-- [ ] Export to CSV/Excel
 - [ ] Attendance reports and analytics
 - [ ] Email notifications
 - [ ] Late arrival tracking
@@ -572,5 +655,5 @@ if (hasAttended) {
 
 ---
 
-**Last Updated:** November 19, 2025  
+**Last Updated:** December 2, 2025  
 **Maintained By:** Development Team

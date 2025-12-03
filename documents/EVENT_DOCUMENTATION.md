@@ -398,6 +398,95 @@ Checks if a user can edit or delete an event. Returns true if:
 - User is the event creator, OR
 - User is Owner/Admin of the organization
 
+---
+
+## 🆕 Geolocation & Attendance Radius (Added Nov 24, 2025)
+
+### Purpose
+Provides optional precise event location (latitude/longitude) and an optional geofencing radius that restricts attendance marking to users physically within the defined area.
+
+### New Columns (events table)
+- `latitude double precision NULL` – Decimal degrees, valid range -90..90
+- `longitude double precision NULL` – Decimal degrees, valid range -180..180
+- `attendance_radius_meters integer NULL` – Restriction radius in meters (100–1000). NULL disables restriction.
+
+### Constraint
+```sql
+CHECK (
+  attendance_radius_meters IS NULL OR
+  (attendance_radius_meters >= 100 AND attendance_radius_meters <= 1000)
+)
+```
+
+### Indexes
+```sql
+CREATE INDEX IF NOT EXISTS idx_events_lat_long ON events(latitude, longitude);
+```
+
+### Usage Rules
+1. All three fields are optional; existing events remain unaffected.
+2. If `attendance_radius_meters` is set (NOT NULL), `latitude` and `longitude` MUST be provided.
+3. Frontend enforces this by requiring a pinned location before enabling radius toggle.
+4. Attendance marking requires browser geolocation. If permission denied, marking fails with clear error.
+
+### Attendance Enforcement Flow
+1. Client obtains current position (`navigator.geolocation.getCurrentPosition`).
+2. Sends `location_lat` and `location_lng` in POST `/api/attendance` request when radius restriction applies.
+3. Server (AttendanceService) fetches event, checks:
+   - Time window validity (existing logic).
+   - Presence of `attendance_radius_meters`, `latitude`, `longitude`.
+   - If set, computes distance using Haversine formula.
+   - Rejects if `distance > attendance_radius_meters` with message containing allowed radius and actual rounded distance.
+
+### Distance Calculation (Haversine)
+Defined in `src/lib/utils.ts`:
+```ts
+haversineDistanceMeters(lat1, lon1, lat2, lon2)
+```
+Earth radius constant: `6371000` meters.
+
+### API Changes
+- `POST /api/event` accepts optional: `latitude`, `longitude`, `attendance_radius_meters`.
+- Validation:
+  - Radius must be 100–1000.
+  - Lat/Long required if radius set.
+- `AttendanceService.markAttendance` now selects `latitude`, `longitude`, `attendance_radius_meters` and performs geofence check.
+
+### Frontend Additions
+- `MapPicker` component (Leaflet) for pin selection.
+- Extended `CreateEventForm` with:
+  - Toggle: Precise Map Location.
+  - Map display & manual lat/long edit fields.
+  - Toggle + range slider for Attendance Radius (100–1000m, default 250m).
+- `AttendanceScanner` requests location when event has radius restriction and passes coordinates.
+
+### Edge Cases & Handling
+| Case | Behavior |
+|------|----------|
+| Radius set, no lat/long | API 400 error on create (validation). |
+| Lat/long set, no radius | Allowed; precise location stored without restriction. |
+| Browser denies geolocation | Attendance marking aborted with client error. |
+| User outside radius | Server returns error with distance info. |
+| Distance exactly equal to radius | Allowed (<= comparison). |
+| Missing coordinates in restricted event | Server error: "Location required..." |
+
+### Future Enhancements (Suggested)
+- Reverse geocoding to auto-fill building/room.
+- Optional map preview on event detail page.
+- Heatmap of attendance scan points (if stored separately).
+- Support indoor positioning (BLE/WiFi) for finer granularity.
+
+### Testing Scenarios
+Add to `TESTING_CHECKLIST.md`:
+- Create event with location only (no radius) → attendance works anywhere.
+- Create event with radius 250m → inside vs. outside marking.
+- Adjust radius (e.g., 100m and 1000m extremes) and verify boundaries.
+- Deny geolocation permission and confirm error message.
+- Invalid lat/long input (UI should prevent, server rejects extremes).
+
+---
+
+
 ```sql
 CREATE OR REPLACE FUNCTION can_manage_event(
     p_event_id uuid,

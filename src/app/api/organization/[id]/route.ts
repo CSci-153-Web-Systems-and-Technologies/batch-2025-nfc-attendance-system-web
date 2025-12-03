@@ -69,7 +69,7 @@ export async function GET(
 
 /**
  * PUT /api/organization/[id]
- * Update organization details
+ * Update organization details (supports logo upload via FormData)
  * Requires: Owner or Admin role
  */
 export async function PUT(
@@ -107,9 +107,43 @@ export async function PUT(
       return authResult
     }
 
-    // Parse request body
-    const body = await request.json()
+    // Check if request contains files (multipart/form-data) or just JSON
+    const contentType = request.headers.get('content-type') || ''
+    const isMultipart = contentType.includes('multipart/form-data')
+
+    let body: any
+    let logoFile: File | null = null
+    let removeLogo = false
+
+    if (isMultipart) {
+      const formData = await request.formData()
+      body = JSON.parse(formData.get('data') as string)
+      const logo = formData.get('logo')
+      if (logo instanceof File) {
+        logoFile = logo
+      }
+      removeLogo = formData.get('removeLogo') === 'true'
+    } else {
+      body = await request.json()
+    }
+
     const { name, description, tag } = body
+
+    // Validate logo if provided
+    if (logoFile) {
+      if (!['image/jpeg', 'image/png'].includes(logoFile.type)) {
+        return NextResponse.json(
+          { error: 'Logo must be JPEG or PNG format' },
+          { status: 400 }
+        )
+      }
+      if (logoFile.size > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: 'Logo file size must not exceed 5MB' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Validate input
     const updateData: any = {}
@@ -136,6 +170,54 @@ export async function PUT(
         )
       }
       updateData.tag = tag?.trim() || null
+    }
+
+    // Get current organization to check for existing logo
+    const { data: currentOrg } = await supabase
+      .from('organizations')
+      .select('logo_url, logo_storage_path')
+      .eq('id', organizationId)
+      .single()
+
+    // Handle logo removal
+    if (removeLogo && currentOrg?.logo_storage_path) {
+      await supabase.storage
+        .from('organization-files')
+        .remove([currentOrg.logo_storage_path])
+      updateData.logo_url = null
+      updateData.logo_storage_path = null
+    }
+
+    // Handle logo upload
+    if (logoFile) {
+      // Delete old logo if exists
+      if (currentOrg?.logo_storage_path) {
+        await supabase.storage
+          .from('organization-files')
+          .remove([currentOrg.logo_storage_path])
+      }
+
+      const timestamp = Date.now()
+      const sanitizedFileName = logoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const storagePath = `${organizationId}/logo/${timestamp}-${sanitizedFileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('organization-files')
+        .upload(storagePath, logoFile, {
+          contentType: logoFile.type,
+          upsert: false,
+        })
+
+      if (uploadError) {
+        console.error('Error uploading logo:', uploadError)
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('organization-files')
+          .getPublicUrl(storagePath)
+
+        updateData.logo_url = publicUrl
+        updateData.logo_storage_path = storagePath
+      }
     }
 
     // Update organization

@@ -33,38 +33,48 @@ export function OrganizationList({
             onClick={() => onSelectOrg(org)}
             className={`w-full text-left px-3 py-3 rounded-lg transition-all duration-200 ${
               selectedOrg?.id === org.id
-                ? 'bg-violet-100 border-2 border-violet-500'
-                : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                ? 'bg-primary/10 border-2 border-primary'
+                : 'bg-muted hover:bg-accent border-2 border-transparent'
             }`}
           >
             <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                selectedOrg?.id === org.id
-                  ? 'bg-violet-500'
-                  : 'bg-violet-200'
-              }`}>
-                <Building2 className={`h-5 w-5 ${
+              {org.logo_url ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                  <img
+                    src={org.logo_url}
+                    alt={`${org.name} logo`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                   selectedOrg?.id === org.id
-                    ? 'text-white'
-                    : 'text-violet-600'
-                }`} />
-              </div>
+                    ? 'bg-primary'
+                    : 'bg-primary/20'
+                }`}>
+                  <Building2 className={`h-5 w-5 ${
+                    selectedOrg?.id === org.id
+                      ? 'text-primary-foreground'
+                      : 'text-primary'
+                  }`} />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className={`font-semibold text-sm truncate ${
                     selectedOrg?.id === org.id
-                      ? 'text-violet-900'
-                      : 'text-gray-800'
+                      ? 'text-primary'
+                      : 'text-foreground'
                   }`}>
                     {org.name}
                   </h3>
                   {org.tag && (
-                    <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-medium rounded">
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded">
                       {org.tag}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Role: <span className="font-medium">{org.user_role}</span>
                 </p>
               </div>
@@ -74,12 +84,12 @@ export function OrganizationList({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-gray-200 my-4"></div>
+      <div className="border-t border-border my-4"></div>
 
       {/* Create Organization Button */}
       <Button
         onClick={handleCreateOrg}
-        className="w-full bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white font-medium"
+        className="w-full bg-gradient-primary text-primary-foreground font-medium"
       >
         <Plus className="h-4 w-4 mr-2" />
         Create Organization

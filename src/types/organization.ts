@@ -7,6 +7,8 @@ export interface Organization {
   name: string
   description: string | null
   tag: string | null
+  logo_url: string | null
+  logo_storage_path: string | null
   owner_user_id: string
   created_at: string
   updated_at: string
@@ -45,6 +47,8 @@ export interface UpdateOrganizationInput {
   name?: string
   description?: string
   tag?: string
+  logo_url?: string | null
+  logo_storage_path?: string | null
 }
 
 export interface AddMemberInput {

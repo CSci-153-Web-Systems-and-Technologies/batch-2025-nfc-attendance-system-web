@@ -74,14 +74,8 @@ export function DynamicBreadcrumb() {
         default:
           // Check if it's a UUID (organization/event ID)
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) {
-            // Try to fetch organization name from previous context
-            const prevSegment = segments[i - 1]
-            if (prevSegment === 'organizations') {
-              label = 'Organization Details'
-              // You could fetch the actual organization name here if needed
-            } else if (prevSegment === 'events') {
-              label = 'Event Details'
-            }
+            // Skip UUID segments - they're just route parameters and shouldn't show in breadcrumb
+            continue
           } else {
             // Capitalize first letter and replace hyphens with spaces
             label = segment
