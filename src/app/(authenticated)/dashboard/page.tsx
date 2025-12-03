@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Info, Plus, Building2, Users, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { EventCard } from '@/components/events/event-card'
 
 // Event shape returned by /api/event (EventWithOrganization)
 type DashboardEvent = {
@@ -23,6 +26,7 @@ type DashboardEvent = {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [onGoing, setOnGoing] = useState<DashboardEvent[]>([])
@@ -36,11 +40,15 @@ export default function DashboardPage() {
         setLoading(true)
         setError(null)
 
-        const [upcomingRes, pastRes] = await Promise.all([
+        const [ongoingRes, upcomingRes, pastRes] = await Promise.all([
+          fetch('/api/event?ongoing=true&limit=20', { cache: 'no-store' }),
           fetch('/api/event?upcoming=true&limit=20', { cache: 'no-store' }),
           fetch('/api/event?past=true&limit=20', { cache: 'no-store' }),
         ])
 
+        if (!ongoingRes.ok) {
+          throw new Error('Failed to load ongoing events')
+        }
         if (!upcomingRes.ok) {
           throw new Error('Failed to load upcoming events')
         }
@@ -48,27 +56,12 @@ export default function DashboardPage() {
           throw new Error('Failed to load past events')
         }
 
+        const ongoingData: DashboardEvent[] = await ongoingRes.json()
         const upcomingData: DashboardEvent[] = await upcomingRes.json()
         const pastData: DashboardEvent[] = await pastRes.json()
 
-        // Compute today's (ongoing) events using local date
-        const today = new Date()
-        const isSameDay = (a: Date, b: Date) =>
-          a.getFullYear() === b.getFullYear() &&
-          a.getMonth() === b.getMonth() &&
-          a.getDate() === b.getDate()
-
-        const todayEvents = upcomingData.filter((e) =>
-          isSameDay(new Date(e.date), today)
-        )
-
-        // Upcoming (exclude today to avoid duplication)
-        const futureEvents = upcomingData.filter(
-          (e) => !isSameDay(new Date(e.date), today)
-        )
-
-        setOnGoing(todayEvents)
-        setUpcoming(futureEvents)
+        setOnGoing(ongoingData)
+        setUpcoming(upcomingData)
         setFinished(pastData)
       } catch (err: any) {
         console.error('Dashboard events load error:', err)
@@ -166,7 +159,7 @@ export default function DashboardPage() {
             </Link>
 
             {/* Create Event Card */}
-            <Link href="/dashboard/create-event">
+            <Link href="/events/create">
               <div className="bg-card rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-border hover:border-primary/50 cursor-pointer group">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
@@ -203,51 +196,43 @@ export default function DashboardPage() {
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Info className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">On Going</h2>
+                <h2 className="text-lg font-semibold text-foreground">Currently Happening</h2>
               </div>
-              <div className="bg-muted/50 rounded-xl p-8 border border-border">
-                {loading ? (
+              {loading ? (
+                <div className="bg-muted rounded-xl p-8 border border-border">
                   <div className="text-center text-sm text-muted-foreground">Loading events…</div>
-                ) : error ? (
-                  <div className="text-center text-sm text-destructive">{error}</div>
-                ) : onGoing.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <div className="bg-primary rounded-lg px-6 py-3">
-                      <p className="text-primary-foreground font-medium">No Current Events On Going</p>
+                </div>
+              ) : error ? (
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-8 border border-red-200 dark:border-red-800">
+                  <div className="text-center text-sm text-red-600 dark:text-red-400">{error}</div>
+                </div>
+              ) : onGoing.length === 0 ? (
+                <Card className="bg-card shadow-md">
+                  <CardContent className="py-12">
+                    <div className="text-center">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
+                        No events currently happening
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Events will appear here when they are in progress.
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {onGoing.map((event) => (
-                      <div
-                        key={event.id}
-                        className="bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-border"
-                      >
-                        <div className="rounded-lg p-4 bg-primary text-primary-foreground">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-base">{event.event_name}</h3>
-                              <p className="text-xs opacity-90 mt-1">{event.organization.name}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30 text-xs px-3"
-                              asChild
-                            >
-                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
-                            </Button>
-                          </div>
-                          <p className="text-sm opacity-90">
-                            {new Date(event.date).toLocaleString()}
-                            {event.location ? ` • ${event.location}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {onGoing.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      status="ongoing"
+                      showOrganization={true}
+                      onClick={() => router.push(`/organizations/${event.organization_id}/events/${event.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Upcoming Events */}
@@ -256,96 +241,76 @@ export default function DashboardPage() {
                 <Info className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
               </div>
-              <div className="bg-muted/50 rounded-xl p-8 border border-border">
-                {loading ? (
+              {loading ? (
+                <div className="bg-muted rounded-xl p-8 border border-border">
                   <div className="text-center text-sm text-muted-foreground">Loading events…</div>
-                ) : upcoming.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <div className="bg-primary rounded-lg px-6 py-3">
-                      <p className="text-primary-foreground font-medium">No Upcoming Events</p>
+                </div>
+              ) : upcoming.length === 0 ? (
+                <Card className="bg-card shadow-md">
+                  <CardContent className="py-12">
+                    <div className="text-center">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
+                        No upcoming events
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Check back later for new events.
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {upcoming.map((event) => (
-                      <div
-                        key={event.id}
-                        className="bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-border"
-                      >
-                        <div className="rounded-lg p-4 bg-accent text-accent-foreground">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-base">{event.event_name}</h3>
-                              <p className="text-xs opacity-90 mt-1">{event.organization.name}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-accent-foreground/10 hover:bg-accent-foreground/20 text-accent-foreground border-accent-foreground/30 text-xs px-3"
-                              asChild
-                            >
-                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
-                            </Button>
-                          </div>
-                          <p className="text-sm opacity-90">
-                            {new Date(event.date).toLocaleString()}
-                            {event.location ? ` • ${event.location}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {upcoming.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      status="upcoming"
+                      showOrganization={true}
+                      onClick={() => router.push(`/organizations/${event.organization_id}/events/${event.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Finished Events */}
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Info className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">Finished Events</h2>
+                <h2 className="text-lg font-semibold text-foreground">Past Events</h2>
               </div>
-              <div className="bg-muted/50 rounded-xl p-8 border border-border">
-                {loading ? (
+              {loading ? (
+                <div className="bg-muted rounded-xl p-8 border border-border">
                   <div className="text-center text-sm text-muted-foreground">Loading events…</div>
-                ) : finished.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <div className="bg-primary rounded-lg px-6 py-3">
-                      <p className="text-primary-foreground font-medium">No Past Events</p>
+                </div>
+              ) : finished.length === 0 ? (
+                <Card className="bg-card shadow-md">
+                  <CardContent className="py-12">
+                    <div className="text-center">
+                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">
+                        No past events
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Your event history will appear here.
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {finished.map((event) => (
-                      <div
-                        key={event.id}
-                        className="bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-border"
-                      >
-                        <div className="rounded-lg p-4 bg-muted text-muted-foreground">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-base">{event.event_name}</h3>
-                              <p className="text-xs opacity-75 mt-1">{event.organization.name}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-muted-foreground/10 hover:bg-muted-foreground/20 text-muted-foreground border-muted-foreground/30 text-xs px-3"
-                              asChild
-                            >
-                              <a href={`/organizations/${event.organization_id}/events`}>View</a>
-                            </Button>
-                          </div>
-                          <p className="text-sm opacity-75">
-                            {new Date(event.date).toLocaleString()}
-                            {event.location ? ` • ${event.location}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {finished.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      status="past"
+                      showOrganization={true}
+                      onClick={() => router.push(`/organizations/${event.organization_id}/events/${event.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           </div>
 

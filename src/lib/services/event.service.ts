@@ -38,6 +38,27 @@ export class EventService {
       }
     }
 
+    // Validate event_start and event_end relationship
+    if ('event_start' in input && 'event_end' in input) {
+      const eventStart = input.event_start
+      const eventEnd = input.event_end
+
+      // If both are provided, validate that start < end
+      if (eventStart && eventEnd) {
+        const startDate = new Date(eventStart)
+        const endDate = new Date(eventEnd)
+
+        if (startDate >= endDate) {
+          return 'Event Start must be before Event End'
+        }
+      }
+
+      // If one is provided but not the other, return error
+      if ((eventStart && !eventEnd) || (!eventStart && eventEnd)) {
+        return 'Both Event Start and Event End must be set together, or leave both empty'
+      }
+    }
+
     return null
   }
   /**
@@ -80,6 +101,11 @@ export class EventService {
         organization_id: input.organization_id,
         description: input.description || null,
         location: input.location || null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        attendance_radius_meters: input.attendance_radius_meters ?? null,
+        event_start: input.event_start || null,
+        event_end: input.event_end || null,
         created_by: userId,
       })
       .select()
@@ -181,6 +207,8 @@ export class EventService {
       created_by: data.created_by,
       created_at: data.created_at,
       updated_at: data.updated_at,
+      event_start: data.event_start,
+      event_end: data.event_end,
       organization: {
         id: data.organization_id,
         name: data.organization_name,
@@ -358,6 +386,12 @@ export class EventService {
     if (input.description !== undefined)
       updateData.description = input.description
     if (input.location !== undefined) updateData.location = input.location
+    if (input.latitude !== undefined) updateData.latitude = input.latitude
+    if (input.longitude !== undefined) updateData.longitude = input.longitude
+    if (input.attendance_radius_meters !== undefined)
+      updateData.attendance_radius_meters = input.attendance_radius_meters
+    if (input.event_start !== undefined) updateData.event_start = input.event_start
+    if (input.event_end !== undefined) updateData.event_end = input.event_end
 
     const { data, error } = await supabase
       .from('events')
@@ -454,6 +488,8 @@ export class EventService {
       created_by: event.created_by,
       created_at: event.created_at,
       updated_at: event.updated_at,
+      event_start: event.event_start,
+      event_end: event.event_end,
       organization: {
         id: event.organization_id,
         name: event.organization_name,
@@ -506,11 +542,83 @@ export class EventService {
       created_by: event.created_by,
       created_at: event.created_at,
       updated_at: event.updated_at,
+      event_start: event.event_start,
+      event_end: event.event_end,
       organization: {
         id: event.organization_id,
         name: event.organization_name,
       },
     }))
+  }
+
+  /**
+   * Get currently ongoing events for a user
+   * Events where now >= event_start AND now <= event_end
+   * Falls back to same-day events if event_start/event_end are null
+   */
+  static async getOngoingEvents(
+    userId: string,
+    limit: number = 10
+  ): Promise<EventWithOrganization[]> {
+    const supabase = await createClient()
+
+    // First get user's organizations
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', userId)
+
+    if (!memberships || memberships.length === 0) {
+      return []
+    }
+
+    const organizationIds = memberships.map((m) => m.organization_id)
+    const now = new Date().toISOString()
+
+    // Query events with attendance windows that are currently active
+    // OR events on today's date without defined windows
+    const { data, error } = await supabase
+      .from('events')
+      .select(
+        `
+        *,
+        organizations!inner(id, name)
+      `
+      )
+      .in('organization_id', organizationIds)
+      .or(`and(event_start.lte.${now},event_end.gte.${now}),and(event_start.is.null,event_end.is.null,date.gte.${new Date().toISOString().split('T')[0]},date.lt.${new Date(Date.now() + 86400000).toISOString().split('T')[0]})`)
+      .order('date', { ascending: true })
+      .limit(limit)
+
+    if (error) {
+      console.error('Error fetching ongoing events:', error)
+      return []
+    }
+
+    // Transform the data to match EventWithOrganization type
+    return data.map((event) => {
+      const organization = Array.isArray(event.organizations)
+        ? event.organizations[0]
+        : event.organizations
+
+      return {
+        id: event.id,
+        event_name: event.event_name,
+        date: event.date,
+        organization_id: event.organization_id,
+        description: event.description,
+        location: event.location,
+        created_by: event.created_by,
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        event_start: event.event_start,
+        event_end: event.event_end,
+        organization: {
+          id: organization.id,
+          name: organization.name,
+        },
+      }
+    })
   }
 
   /**

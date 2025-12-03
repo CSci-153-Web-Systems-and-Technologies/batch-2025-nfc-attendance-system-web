@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -94,6 +95,20 @@
   --sidebar-accent-foreground: oklch(0.525 0.224 293);
   --sidebar-border: oklch(0.92 0.015 293);
   --sidebar-ring: oklch(0.525 0.224 293);
+  
+  /* Theme-aware gradients */
+  --gradient-page-from: oklch(0.97 0.02 293); /* violet-50 */
+  --gradient-page-via: oklch(0.97 0.02 300); /* purple-50 */
+  --gradient-page-to: oklch(0.97 0.02 350); /* pink-50 */
+  
+  --gradient-primary-from: oklch(0.525 0.224 293); /* violet-500 */
+  --gradient-primary-to: oklch(0.525 0.224 300); /* purple-500 */
+  
+  --gradient-avatar-from: oklch(0.75 0.18 55); /* orange-400 */
+  --gradient-avatar-to: oklch(0.65 0.2 45); /* orange-600 */
+  
+  --gradient-muted-from: oklch(0.93 0.03 293); /* violet-100 */
+  --gradient-muted-to: oklch(0.93 0.03 300); /* purple-100 */
 }
 
 .dark {
@@ -145,6 +160,20 @@
   --sidebar-accent-foreground: oklch(0.985 0.01 293);
   --sidebar-border: oklch(0.3 0.03 293);
   --sidebar-ring: oklch(0.68 0.22 293);
+  
+  /* Theme-aware gradients - Dark mode */
+  --gradient-page-from: oklch(0.17 0.025 293); /* dark violet */
+  --gradient-page-via: oklch(0.16 0.03 300); /* dark purple */
+  --gradient-page-to: oklch(0.15 0.025 350); /* dark pink tint */
+  
+  --gradient-primary-from: oklch(0.55 0.2 293); /* violet-500 adjusted */
+  --gradient-primary-to: oklch(0.55 0.2 300); /* purple-500 adjusted */
+  
+  --gradient-avatar-from: oklch(0.7 0.17 55); /* orange-400 adjusted */
+  --gradient-avatar-to: oklch(0.6 0.18 45); /* orange-600 adjusted */
+  
+  --gradient-muted-from: oklch(0.3 0.04 293); /* dark violet muted */
+  --gradient-muted-to: oklch(0.3 0.04 300); /* dark purple muted */
 }
 
 @layer base {
@@ -154,4 +183,21 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Theme-aware gradient utility classes */
+.bg-gradient-page {
+  background: linear-gradient(to bottom right, var(--gradient-page-from), var(--gradient-page-via), var(--gradient-page-to));
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(to bottom right, var(--gradient-primary-from), var(--gradient-primary-to));
+}
+
+.bg-gradient-avatar {
+  background: linear-gradient(to bottom right, var(--gradient-avatar-from), var(--gradient-avatar-to));
+}
+
+.bg-gradient-muted {
+  background: linear-gradient(to bottom right, var(--gradient-muted-from), var(--gradient-muted-to));
 }
