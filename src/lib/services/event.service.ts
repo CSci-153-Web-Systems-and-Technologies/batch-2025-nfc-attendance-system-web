@@ -446,24 +446,42 @@ export class EventService {
   /**
    * Get upcoming events for a user (events in the future)
    * Uses upcoming_events view for optimized query
+   * @param organizationId - Optional: filter to a specific organization
    */
   static async getUpcomingEvents(
     userId: string,
-    limit: number = 10
+    limit: number = 10,
+    organizationId?: string
   ): Promise<EventWithOrganization[]> {
     const supabase = await createClient()
 
-    // First get user's organizations
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', userId)
+    let organizationIds: string[]
 
-    if (!memberships || memberships.length === 0) {
-      return []
+    if (organizationId) {
+      // Verify user is a member of this organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (!membership) {
+        return []
+      }
+      organizationIds = [organizationId]
+    } else {
+      // Get all user's organizations
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+
+      if (!memberships || memberships.length === 0) {
+        return []
+      }
+      organizationIds = memberships.map((m) => m.organization_id)
     }
-
-    const organizationIds = memberships.map((m) => m.organization_id)
 
     // Query the upcoming_events view
     const { data, error } = await supabase
@@ -555,24 +573,42 @@ export class EventService {
    * Get currently ongoing events for a user
    * Events where now >= event_start AND now <= event_end
    * Falls back to same-day events if event_start/event_end are null
+   * @param organizationId - Optional: filter to a specific organization
    */
   static async getOngoingEvents(
     userId: string,
-    limit: number = 10
+    limit: number = 10,
+    organizationId?: string
   ): Promise<EventWithOrganization[]> {
     const supabase = await createClient()
 
-    // First get user's organizations
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', userId)
+    let organizationIds: string[]
 
-    if (!memberships || memberships.length === 0) {
-      return []
+    if (organizationId) {
+      // Verify user is a member of this organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (!membership) {
+        return []
+      }
+      organizationIds = [organizationId]
+    } else {
+      // Get all user's organizations
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+
+      if (!memberships || memberships.length === 0) {
+        return []
+      }
+      organizationIds = memberships.map((m) => m.organization_id)
     }
-
-    const organizationIds = memberships.map((m) => m.organization_id)
     const now = new Date().toISOString()
 
     // Query events with attendance windows that are currently active
