@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { OrganizationWithRole, OrganizationMemberWithUser } from '@/types/organization'
+import { OrganizationWithRole } from '@/types/organization'
+import { MembershipWithUser } from '@/types/membership'
 import { 
   Building2, 
   Calendar, 
@@ -38,7 +39,7 @@ import {
 
 interface OrganizationSettingsProps {
   organization: OrganizationWithRole
-  members: OrganizationMemberWithUser[]
+  members: MembershipWithUser[]
   ownerName: string
 }
 
@@ -129,11 +130,11 @@ export function OrganizationSettings({
       {/* Back Button */}
       <Button
         variant="ghost"
-        onClick={() => router.push(`/organizations/${organization.id}`)}
+        onClick={() => router.push('/organizations')}
         className="mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Organization
+        Back to Organizations
       </Button>
 
       {/* Page Header */}

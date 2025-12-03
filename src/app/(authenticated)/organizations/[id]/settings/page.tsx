@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/server'
 import { OrganizationService } from '@/lib/services/organization.service'
+import { MembershipService } from '@/lib/services/membership.service'
 import { UserService } from '@/lib/services/user.service'
 import { OrganizationSettings } from '@/components/organizations/organization-settings'
 
@@ -35,7 +36,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   }
 
   // Fetch organization members for transfer ownership dropdown
-  const members = await OrganizationService.getOrganizationMembers(id)
+  const members = await MembershipService.getOrganizationMembers(id)
 
   // Get owner info
   const owner = await UserService.getUserById(organization.owner_user_id)
