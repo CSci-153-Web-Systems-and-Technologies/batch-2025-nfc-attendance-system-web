@@ -678,16 +678,21 @@ For questions or issues:
 - Featured images for events (event posters)
 - Automatic file cleanup (3-day grace period)
 - Map preview on event detail pages (for Owners, Admins, Attendance Takers)
-
+- Attendance reports (Excel export)
+- 
 ### Future Enhancements 🚀
 - Analytics dashboard with charts
-- Attendance reports (PDF/CSV export)
 - Email notifications for events
 - Calendar integration
 - Mobile app (React Native)
 - Advanced reporting and analytics
 - Event templates
 - Recurring events
+- **Organization Settings Improvements**:
+   - Organization visibility settings (public/private for search)
+   - Default event settings per organization
+   - Notification preferences
+   - Export organization data (events, attendance CSV)
 - **File Upload Improvements**:
    - Magic byte validation for enhanced security
    - Organization-level storage quotas
