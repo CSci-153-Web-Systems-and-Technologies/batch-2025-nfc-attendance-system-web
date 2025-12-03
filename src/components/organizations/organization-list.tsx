@@ -38,17 +38,27 @@ export function OrganizationList({
             }`}
           >
             <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                selectedOrg?.id === org.id
-                  ? 'bg-primary'
-                  : 'bg-primary/20'
-              }`}>
-                <Building2 className={`h-5 w-5 ${
+              {org.logo_url ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                  <img
+                    src={org.logo_url}
+                    alt={`${org.name} logo`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                   selectedOrg?.id === org.id
-                    ? 'text-primary-foreground'
-                    : 'text-primary'
-                }`} />
-              </div>
+                    ? 'bg-primary'
+                    : 'bg-primary/20'
+                }`}>
+                  <Building2 className={`h-5 w-5 ${
+                    selectedOrg?.id === org.id
+                      ? 'text-primary-foreground'
+                      : 'text-primary'
+                  }`} />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className={`font-semibold text-sm truncate ${

@@ -155,15 +155,23 @@ updated_at       | timestamp with timezone | NO       | now()            | 6
 -- Description: Stores organization information
 -- Rows: 3
 /*
-COLUMN NAME      | DATA TYPE               | NULLABLE | DEFAULT          | POSITION
------------------|-------------------------|----------|------------------|----------
-id               | uuid                    | NO       | gen_random_uuid()| 1
-name             | text                    | NO       | null             | 2
-description      | text                    | YES      | null             | 3
-owner_user_id    | uuid                    | NO       | null             | 4
-created_at       | timestamp with timezone | NO       | now()            | 5
-updated_at       | timestamp with timezone | NO       | now()            | 6
-tag              | text                    | YES      | null             | 7
+COLUMN NAME       | DATA TYPE               | NULLABLE | DEFAULT          | POSITION
+------------------|-------------------------|----------|------------------|----------
+id                | uuid                    | NO       | gen_random_uuid()| 1
+name              | text                    | NO       | null             | 2
+description       | text                    | YES      | null             | 3
+owner_user_id     | uuid                    | NO       | null             | 4
+created_at        | timestamp with timezone | NO       | now()            | 5
+updated_at        | timestamp with timezone | NO       | now()            | 6
+tag               | text                    | YES      | null             | 7
+logo_url          | text                    | YES      | null             | 8
+logo_storage_path | text                    | YES      | null             | 9
+
+NOTE: logo_url is the public URL for the organization's logo/profile picture.
+      logo_storage_path is the storage bucket path for deletion (format: {org_id}/logo/{timestamp}-{filename}).
+      Both are nullable - organizations don't require a logo.
+      Logos are stored in the 'organization-files' Supabase storage bucket.
+      File constraints: 5MB max, JPEG/PNG only, 1:1 square aspect ratio recommended.
 */
 
 -- TABLE: users
@@ -670,8 +678,16 @@ Status Summary:
 - Join request workflow implemented
 - Guest attendance support added
 - Excel export available for Admin/Owner
+- Organization logo upload support added
 
 Recent Updates (December 2, 2025):
+✅ Added logo_url column to organizations table (nullable text)
+✅ Added logo_storage_path column to organizations table (nullable text)
+✅ Created 'organization-files' storage bucket for organization logos
+✅ Added RLS policies for organization-files bucket (authenticated read, owner/admin write/delete)
+✅ Logo constraints: 5MB max, JPEG/PNG only, 1:1 square aspect ratio recommended
+
+Previous Updates (December 2, 2025):
 ✅ Added is_member column to event_attendance table
 ✅ Updated mark_attendance function to support non-members (guests)
 ✅ Updated event_attendance_summary view with member_count and non_member_count
@@ -689,23 +705,27 @@ Previous Updates (November 1, 2025):
 
 Table Summary (6 base tables, 4 views):
 1. users - User profiles with auth provider tracking
-2. organizations - Organization management with tags
+2. organizations - Organization management with tags and logos
 3. organization_members - Membership management
 4. organization_join_requests - Join request workflow
 5. events - Event management
-6. event_attendance - Attendance records with guest support (NEW)
+6. event_attendance - Attendance records with guest support
 7. attendance_with_details (VIEW) - Full attendance details
 8. event_attendance_summary (VIEW) - Attendance statistics
 9. membership_with_organization (VIEW)
 10. membership_with_user (VIEW)
 
-Policy Summary (29 total):
-- event_attendance: 4 policies (NEW)
+Storage Buckets:
+1. organization-files - Organization logos/profile pictures
+
+Policy Summary (29+ total):
+- event_attendance: 4 policies
 - events: 6 policies
 - organization_join_requests: 5 policies
 - organization_members: 6 policies
 - organizations: 4 policies
 - users: 4 policies
+- organization-files (storage): 4 policies (read/insert/update/delete)
 
 Function Summary (18 total):
 - mark_attendance (UPDATED - supports guests)

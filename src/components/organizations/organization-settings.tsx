@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { OrganizationWithRole } from '@/types/organization'
+import { OrganizationWithRole, hasPermission } from '@/types/organization'
 import { MembershipWithUser } from '@/types/membership'
 import { 
   Building2, 
@@ -13,7 +13,8 @@ import {
   Trash2, 
   UserCog,
   ArrowLeft,
-  CalendarSync
+  CalendarSync,
+  Pencil
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ export function OrganizationSettings({
 }: OrganizationSettingsProps) {
   const router = useRouter()
   const isOwner = organization.user_role === 'Owner'
+  const canEdit = hasPermission(organization.user_role, 'canManageOrganization')
   
   // Delete organization state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -149,14 +151,36 @@ export function OrganizationSettings({
         {/* Organization Info Card */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {organization.logo_url ? (
+                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+                    <img
+                      src={organization.logo_url}
+                      alt={`${organization.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+                <div>
+                  <CardTitle>Organization Information</CardTitle>
+                  <CardDescription>Basic details about your organization</CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle>Organization Information</CardTitle>
-                <CardDescription>Basic details about your organization</CardDescription>
-              </div>
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/organizations/${organization.id}/edit`)}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
