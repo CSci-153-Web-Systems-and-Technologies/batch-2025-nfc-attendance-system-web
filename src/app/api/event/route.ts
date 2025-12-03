@@ -54,14 +54,15 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit')
       ? parseInt(searchParams.get('limit') as string)
       : undefined
+    const organizationId = filters.organization_id
 
     let events
     if (upcoming) {
-      events = await EventService.getUpcomingEvents(userId, limit)
+      events = await EventService.getUpcomingEvents(userId, limit, organizationId)
     } else if (past) {
       events = await EventService.getPastEvents(userId, limit)
     } else if (ongoing) {
-      events = await EventService.getOngoingEvents(userId, limit)
+      events = await EventService.getOngoingEvents(userId, limit, organizationId)
     } else {
       events = await EventService.getUserEvents(userId, filters)
     }
