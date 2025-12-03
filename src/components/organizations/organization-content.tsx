@@ -141,7 +141,10 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
                   </div>
                 </button>
 
-                <button className="p-4 border-2 border-border rounded-lg hover:border-primary hover:bg-accent transition-all duration-200 text-left">
+                <button 
+                  onClick={() => router.push(`/organizations/${organization.id}/settings`)}
+                  className="p-4 border-2 border-border rounded-lg hover:border-primary hover:bg-accent transition-all duration-200 text-left"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
                       <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400" />
