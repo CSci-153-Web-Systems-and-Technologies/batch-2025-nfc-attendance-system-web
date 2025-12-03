@@ -34,16 +34,21 @@ export function EventsPreviewCard({ organizationId, canManageEvents }: EventsPre
           fetch(`/api/event?organization_id=${organizationId}&upcoming=true&limit=4`)
         ])
 
+        let ongoingData: EventPreview[] = []
         if (ongoingRes.ok) {
           const data = await ongoingRes.json()
-          setOngoingEvents(data.events || [])
+          // API returns array directly for ongoing/upcoming, or { events: [...] } for regular queries
+          ongoingData = Array.isArray(data) ? data : (data.events || [])
+          setOngoingEvents(ongoingData)
         }
 
         if (upcomingRes.ok) {
           const data = await upcomingRes.json()
+          // API returns array directly for ongoing/upcoming, or { events: [...] } for regular queries
+          const upcomingData = Array.isArray(data) ? data : (data.events || [])
           // Filter out any events that are already in ongoing
-          const ongoingIds = new Set(ongoingEvents.map(e => e.id))
-          setUpcomingEvents((data.events || []).filter((e: EventPreview) => !ongoingIds.has(e.id)))
+          const ongoingIds = new Set(ongoingData.map(e => e.id))
+          setUpcomingEvents(upcomingData.filter((e: EventPreview) => !ongoingIds.has(e.id)))
         }
       } catch (error) {
         console.error('Error fetching events:', error)
