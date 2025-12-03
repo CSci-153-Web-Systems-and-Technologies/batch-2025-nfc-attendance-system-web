@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, ArrowLeft, Loader2 } from 'lucide-react'
+import { Building2, ArrowLeft, Loader2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +20,9 @@ export function EditOrganizationForm({ organization }: EditOrganizationFormProps
     description: organization.description || '',
     tag: organization.tag || '',
   })
+  const [logo, setLogo] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(organization.logo_url || null)
+  const [removeLogo, setRemoveLogo] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +32,37 @@ export function EditOrganizationForm({ organization }: EditOrganizationFormProps
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
     setError(null)
+  }
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Logo must be JPEG or PNG format')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(`Logo size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds 5MB limit`)
+      return
+    }
+
+    setLogo(file)
+    setRemoveLogo(false)
+    setError(null)
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveLogo = () => {
+    setLogo(null)
+    setLogoPreview(null)
+    setRemoveLogo(true)
   }
 
   const validateForm = (): string | null => {
@@ -56,17 +90,43 @@ export function EditOrganizationForm({ organization }: EditOrganizationFormProps
     setIsSubmitting(true)
 
     try {
-      const response = await fetch(`/api/organization/${organization.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      let response
+
+      // Use FormData if we have a new logo or removing logo
+      if (logo || removeLogo) {
+        const formDataPayload = new FormData()
+        formDataPayload.append('data', JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           tag: formData.tag.trim() || null,
-        }),
-      })
+        }))
+        
+        if (logo) {
+          formDataPayload.append('logo', logo)
+        }
+        
+        if (removeLogo) {
+          formDataPayload.append('removeLogo', 'true')
+        }
+
+        response = await fetch(`/api/organization/${organization.id}`, {
+          method: 'PUT',
+          body: formDataPayload,
+        })
+      } else {
+        // Regular JSON request
+        response = await fetch(`/api/organization/${organization.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            description: formData.description.trim() || null,
+            tag: formData.tag.trim() || null,
+          }),
+        })
+      }
 
       if (!response.ok) {
         const data = await response.json()
@@ -109,9 +169,17 @@ export function EditOrganizationForm({ organization }: EditOrganizationFormProps
       {/* Page Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-            <Building2 className="h-6 w-6 text-primary-foreground" />
-          </div>
+          {logoPreview ? (
+            <img
+              src={logoPreview}
+              alt={organization.name}
+              className="w-12 h-12 object-cover rounded-xl border border-input"
+            />
+          ) : (
+            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-primary-foreground" />
+            </div>
+          )}
           <div>
             <h1 className="text-3xl font-bold text-foreground">Edit Organization</h1>
             <p className="text-muted-foreground">
@@ -134,6 +202,50 @@ export function EditOrganizationForm({ organization }: EditOrganizationFormProps
                 {error}
               </div>
             )}
+
+            {/* Organization Logo */}
+            <div className="space-y-2">
+              <Label>Organization Logo (Optional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Recommended: Square image (1:1 ratio) • Max 5MB • JPG or PNG
+              </p>
+              {logoPreview && !removeLogo ? (
+                <div className="relative w-32 h-32">
+                  <img
+                    src={logoPreview}
+                    alt="Logo preview"
+                    className="w-32 h-32 object-cover rounded-xl border border-input"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6"
+                    onClick={handleRemoveLogo}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                  {!logo && organization.logo_url && (
+                    <p className="text-xs text-muted-foreground mt-1">Current logo</p>
+                  )}
+                </div>
+              ) : (
+                <div className="w-32 h-32 border-2 border-dashed border-input rounded-xl flex flex-col items-center justify-center hover:border-primary/50 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    id="logo"
+                    accept="image/jpeg,image/png"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
+                  <label htmlFor="logo" className="cursor-pointer text-center p-2">
+                    <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                    <p className="text-xs text-muted-foreground">Upload logo</p>
+                  </label>
+                </div>
+              )}
+            </div>
 
             {/* Organization Name */}
             <div className="space-y-2">

@@ -153,9 +153,19 @@ export function OrganizationSettings({
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-primary" />
-                </div>
+                {organization.logo_url ? (
+                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+                    <img
+                      src={organization.logo_url}
+                      alt={`${organization.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                )}
                 <div>
                   <CardTitle>Organization Information</CardTitle>
                   <CardDescription>Basic details about your organization</CardDescription>

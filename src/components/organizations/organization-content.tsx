@@ -21,9 +21,19 @@ export function OrganizationContent({ organization }: OrganizationContentProps) 
       <Card className="bg-card shadow-md">
         <CardHeader className="pb-4">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 bg-gradient-primary rounded-xl flex items-center justify-center shrink-0">
-              <Building2 className="h-7 w-7 text-primary-foreground" />
-            </div>
+            {organization.logo_url ? (
+              <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                <img
+                  src={organization.logo_url}
+                  alt={`${organization.name} logo`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-14 h-14 bg-gradient-primary rounded-xl flex items-center justify-center shrink-0">
+                <Building2 className="h-7 w-7 text-primary-foreground" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
                 <CardTitle className="text-xl sm:text-2xl font-bold text-foreground truncate">
