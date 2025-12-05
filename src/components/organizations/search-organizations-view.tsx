@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Search, Building2, ArrowLeft, Users, Filter, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, Building2, ArrowLeft, Users, Loader2, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
 
 interface SearchOrganizationsViewProps {
@@ -19,28 +19,17 @@ interface SearchFilters {
   excludeJoined: boolean
 }
 
-interface PaginationInfo {
-  page: number
-  limit: number
-  total: number
-  total_pages: number
-  has_next_page: boolean
-  has_previous_page: boolean
-}
+const PAGE_SIZE = 10
 
 export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    page: 1,
-    limit: 10,
-    total: 0,
-    total_pages: 0,
-    has_next_page: false,
-    has_previous_page: false,
-  })
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<SearchFilters>({
     sortField: 'name',
     sortOrder: 'asc',
@@ -52,16 +41,25 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
 
   // Auto-search when filters change (but not on initial mount)
   const [hasSearched, setHasSearched] = useState(false)
+  const isInitialMount = useRef(true)
 
-  const handleSearch = async (page: number = 1) => {
-    setIsSearching(true)
+  const hasMore = searchResults.length < total
+
+  const handleSearch = useCallback(async (reset: boolean = false) => {
+    if (reset) {
+      setIsSearching(true)
+    } else {
+      setIsLoadingMore(true)
+    }
     setHasSearched(true)
     
     try {
+      const effectiveOffset = reset ? 0 : offset
+      
       // Build query parameters
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: pagination.limit.toString(),
+        limit: PAGE_SIZE.toString(),
+        offset: effectiveOffset.toString(),
         sort: filters.sortField,
         order: filters.sortOrder,
         exclude_joined: filters.excludeJoined.toString(),
@@ -86,12 +84,21 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
       }
 
       const data = await response.json()
-      setSearchResults(data.results || [])
-      setPagination(data.pagination || pagination)
+      const newResults = data.results || []
+      
+      if (reset) {
+        setSearchResults(newResults)
+        setOffset(newResults.length)
+      } else {
+        setSearchResults(prev => [...prev, ...newResults])
+        setOffset(prev => prev + newResults.length)
+      }
+      
+      setTotal(data.pagination?.total || 0)
       
       // Track pending requests from search results
-      const pending = new Set<string>()
-      data.results?.forEach((org: any) => {
+      const pending = new Set<string>(pendingRequests)
+      newResults.forEach((org: any) => {
         if (org.has_pending_request) {
           pending.add(org.id)
         }
@@ -99,18 +106,44 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
       setPendingRequests(pending)
     } catch (error) {
       console.error('Error searching organizations:', error)
-      setSearchResults([])
+      if (reset) {
+        setSearchResults([])
+      }
     } finally {
       setIsSearching(false)
+      setIsLoadingMore(false)
     }
-  }
+  }, [searchQuery, filters, offset, pendingRequests])
 
   // Re-search when filters change (after initial search)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    
     if (hasSearched) {
-      handleSearch(1)
+      handleSearch(true)
     }
   }, [filters])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const element = loadMoreRef.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isSearching && !isLoadingMore && hasMore && hasSearched) {
+          handleSearch(false)
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(element)
+    return () => observer.unobserve(element)
+  }, [hasMore, isSearching, isLoadingMore, hasSearched, handleSearch])
 
   const handleRequestToJoin = async (organizationId: string) => {
     if (requestingJoin) return // Prevent multiple simultaneous requests
@@ -136,9 +169,6 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
       // Add to pending requests set
       setPendingRequests(prev => new Set(prev).add(organizationId))
       
-      // Refresh search results to update the pending request status
-      await handleSearch(pagination.page)
-      
       // You could add a toast notification here
       alert('Join request sent successfully! Wait for admin approval.')
     } catch (error) {
@@ -147,11 +177,6 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
     } finally {
       setRequestingJoin(null)
     }
-  }
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > pagination.total_pages) return
-    handleSearch(newPage)
   }
 
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
@@ -197,7 +222,7 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
               />
             </div>
             <Button
-              onClick={() => handleSearch(1)}
+              onClick={() => handleSearch(true)}
               disabled={isSearching}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
@@ -292,20 +317,17 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
       </Card>
 
       {/* Search Results */}
-      {isSearching ? (
+      {isSearching && searchResults.length === 0 ? (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
           <p className="text-muted-foreground mt-4">Searching...</p>
         </div>
       ) : searchResults.length > 0 ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">
-              Search Results ({pagination.total} total)
+              Search Results ({total} total)
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Page {pagination.page} of {pagination.total_pages}
-            </p>
           </div>
 
           {searchResults.map((org) => (
@@ -382,57 +404,11 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
             </Card>
           ))}
 
-          {/* Pagination */}
-          {pagination.total_pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={!pagination.has_previous_page || isSearching}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
-                  // Show pages around current page
-                  let pageNum
-                  if (pagination.total_pages <= 5) {
-                    pageNum = i + 1
-                  } else if (pagination.page <= 3) {
-                    pageNum = i + 1
-                  } else if (pagination.page >= pagination.total_pages - 2) {
-                    pageNum = pagination.total_pages - 4 + i
-                  } else {
-                    pageNum = pagination.page - 2 + i
-                  }
-
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={pagination.page === pageNum ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handlePageChange(pageNum)}
-                      disabled={isSearching}
-                      className={pagination.page === pageNum ? 'bg-primary hover:bg-primary/90' : ''}
-                    >
-                      {pageNum}
-                    </Button>
-                  )
-                })}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={!pagination.has_next_page || isSearching}
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+          {/* Load more sentinel */}
+          <div ref={loadMoreRef} />
+          {isLoadingMore && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           )}
         </div>

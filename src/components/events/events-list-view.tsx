@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Calendar,
@@ -13,6 +13,7 @@ import {
   Clock,
   FileText,
   Timer,
+  Loader2,
 } from 'lucide-react'
 import { MembershipRole } from '@/types/membership'
 import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
@@ -37,49 +38,106 @@ interface EventsListViewProps {
   organizationId: string
   organizationName: string
   userRole: MembershipRole
-  events: Event[]
+  events: Event[] // Initial events from server
 }
+
+const PAGE_SIZE = 10
 
 export function EventsListView({
   organizationId,
   organizationName,
   userRole,
-  events,
+  events: initialEvents,
 }: EventsListViewProps) {
   const router = useRouter()
   const [filter, setFilter] = useState<'all' | 'ongoing' | 'upcoming' | 'past'>('all')
+  const [events, setEvents] = useState<Event[]>(initialEvents.slice(0, PAGE_SIZE))
+  const [total, setTotal] = useState(initialEvents.length)
+  const [offset, setOffset] = useState(Math.min(initialEvents.length, PAGE_SIZE))
+  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const isInitialMount = useRef(true)
 
+  const hasMore = events.length < total
   const canCreateEvents = ['Owner', 'Admin', 'Attendance Taker'].includes(userRole)
 
+  // Filter events client-side for display
   const filteredEvents = events.filter((event) => {
     if (filter === 'all') return true
     const status = getEventStatus(event)
     return status === filter
   })
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
+  // Fetch events from API
+  const fetchEvents = useCallback(async (reset: boolean = false, filterType: string = filter) => {
+    try {
+      const effectiveOffset = reset ? 0 : offset
+      let url = `/api/event?organization_id=${organizationId}&limit=${PAGE_SIZE}&offset=${effectiveOffset}`
+      
+      // Map filter to API parameters
+      if (filterType === 'ongoing') {
+        url = `/api/event?organization_id=${organizationId}&ongoing=true&limit=${PAGE_SIZE}&offset=${effectiveOffset}`
+      } else if (filterType === 'upcoming') {
+        url = `/api/event?organization_id=${organizationId}&upcoming=true&limit=${PAGE_SIZE}&offset=${effectiveOffset}`
+      } else if (filterType === 'past') {
+        url = `/api/event?organization_id=${organizationId}&past=true&limit=${PAGE_SIZE}&offset=${effectiveOffset}`
+      }
+      
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) throw new Error('Failed to load events')
+      
+      const data = await res.json()
+      
+      // The API returns events with organization info, we need to transform if needed
+      const newEvents: Event[] = (data.events || []).map((e: any) => ({
+        ...e,
+        users: e.users || { name: 'Unknown', email: '' }
+      }))
+      
+      if (reset) {
+        setEvents(newEvents)
+        setOffset(newEvents.length)
+      } else {
+        setEvents(prev => [...prev, ...newEvents])
+        setOffset(prev => prev + newEvents.length)
+      }
+      
+      setTotal(data.pagination?.total || 0)
+    } catch (err) {
+      console.error('Error fetching events:', err)
+    }
+  }, [organizationId, offset, filter])
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
+  // Refetch when filter changes
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    
+    setIsLoading(true)
+    fetchEvents(true, filter).finally(() => setIsLoading(false))
+  }, [filter])
 
-  const now = new Date()
+  // Infinite scroll observer
+  useEffect(() => {
+    const element = loadMoreRef.current
+    if (!element) return
 
-  const isUpcoming = (dateString: string) => {
-    return new Date(dateString) > now
-  }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading && !isLoadingMore && hasMore) {
+          setIsLoadingMore(true)
+          fetchEvents(false).finally(() => setIsLoadingMore(false))
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(element)
+    return () => observer.unobserve(element)
+  }, [hasMore, isLoading, isLoadingMore, fetchEvents])
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -155,8 +213,13 @@ export function EventsListView({
         </button>
       </div>
 
-      {/* Events List */}
-      {filteredEvents.length === 0 ? (
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filteredEvents.length === 0 ? (
+        /* Events List */
         <Card className="bg-card shadow-md">
           <CardContent className="py-12">
             <div className="text-center">
@@ -268,7 +331,7 @@ export function EventsListView({
                     {/* Creator */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                       <User className="h-3 w-3" />
-                      <span>Created by {event.users.name}</span>
+                      <span>Created by {event.users?.name || 'Unknown'}</span>
                     </div>
                   </div>
 
@@ -286,6 +349,14 @@ export function EventsListView({
             </Card>
           )
           })}
+          
+          {/* Load more sentinel */}
+          <div ref={loadMoreRef} />
+          {isLoadingMore && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          )}
         </div>
       )}
     </div>

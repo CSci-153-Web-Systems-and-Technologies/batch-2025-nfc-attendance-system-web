@@ -53,21 +53,33 @@ export async function GET(request: NextRequest) {
     const ongoing = searchParams.get('ongoing') === 'true'
     const limit = searchParams.get('limit')
       ? parseInt(searchParams.get('limit') as string)
-      : undefined
+      : 10
+    const offset = searchParams.get('offset')
+      ? parseInt(searchParams.get('offset') as string)
+      : 0
     const organizationId = filters.organization_id
 
-    let events
+    let result
     if (upcoming) {
-      events = await EventService.getUpcomingEvents(userId, limit, organizationId)
+      result = await EventService.getUpcomingEvents(userId, limit, organizationId, offset)
     } else if (past) {
-      events = await EventService.getPastEvents(userId, limit)
+      result = await EventService.getPastEvents(userId, limit, offset)
     } else if (ongoing) {
-      events = await EventService.getOngoingEvents(userId, limit, organizationId)
+      result = await EventService.getOngoingEvents(userId, limit, organizationId, offset)
     } else {
-      events = await EventService.getUserEvents(userId, filters)
+      const events = await EventService.getUserEvents(userId, filters)
+      result = { events, total: events.length }
     }
 
-    return NextResponse.json(events)
+    return NextResponse.json({
+      events: result.events,
+      pagination: {
+        total: result.total,
+        offset,
+        limit,
+        has_more: offset + result.events.length < result.total,
+      },
+    })
   } catch (error) {
     console.error('Error fetching events:', error)
     return NextResponse.json(

@@ -8,7 +8,8 @@ import { UserService } from '@/lib/services/user.service'
  * 
  * Query parameters:
  * - q: Search query (searches name and description)
- * - page: Page number (default: 1)
+ * - page: Page number (default: 1) - alternative to offset
+ * - offset: Offset for pagination (default: 0)
  * - limit: Results per page (default: 10, max: 50)
  * - sort: Sort field (name, created_at, member_count)
  * - order: Sort order (asc, desc) (default: asc)
@@ -39,8 +40,15 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('q')?.trim() || ''
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '10')))
+    // Support both offset-based and page-based pagination
+    const offsetParam = searchParams.get('offset')
+    const pageParam = searchParams.get('page')
+    const offset = offsetParam !== null 
+      ? Math.max(0, parseInt(offsetParam))
+      : pageParam !== null 
+        ? (Math.max(1, parseInt(pageParam)) - 1) * limit
+        : 0
     const sortField = searchParams.get('sort') || 'name'
     const sortOrder = searchParams.get('order') === 'desc' ? 'desc' : 'asc'
     const minMembers = searchParams.get('min_members') ? parseInt(searchParams.get('min_members')!) : undefined
@@ -97,7 +105,6 @@ export async function GET(request: NextRequest) {
     queryBuilder = queryBuilder.order(orderColumn, { ascending: sortOrder === 'asc' })
 
     // Apply pagination
-    const offset = (page - 1) * limit
     queryBuilder = queryBuilder.range(offset, offset + limit - 1)
 
     // Execute query
@@ -145,18 +152,21 @@ export async function GET(request: NextRequest) {
 
     // Calculate pagination metadata
     const totalPages = Math.ceil((totalCount || 0) / limit)
-    const hasNextPage = page < totalPages
-    const hasPreviousPage = page > 1
+    const currentPage = Math.floor(offset / limit) + 1
+    const hasNextPage = offset + enrichedResults.length < (totalCount || 0)
+    const hasPreviousPage = offset > 0
 
     return NextResponse.json({
       results: enrichedResults,
       pagination: {
-        page,
+        page: currentPage,
+        offset,
         limit,
         total: totalCount || 0,
         total_pages: totalPages,
         has_next_page: hasNextPage,
         has_previous_page: hasPreviousPage,
+        has_more: hasNextPage,
       },
       filters: {
         query,
