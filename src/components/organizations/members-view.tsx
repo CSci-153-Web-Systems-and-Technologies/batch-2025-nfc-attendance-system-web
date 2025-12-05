@@ -81,9 +81,9 @@ export function MembersView({
   const getRoleIcon = (role: MembershipRole) => {
     switch (role) {
       case 'Owner':
-        return <Crown className="w-4 h-4 text-primary" />
+        return <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       case 'Admin':
-        return <Shield className="w-4 h-4 text-accent" />
+        return <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
       case 'Member':
         return <User className="w-4 h-4 text-muted-foreground" />
     }
@@ -93,11 +93,11 @@ export function MembersView({
   const getRoleColor = (role: MembershipRole) => {
     switch (role) {
       case 'Owner':
-        return 'bg-primary/10 text-primary border-primary/20'
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
       case 'Admin':
-        return 'bg-accent/10 text-accent-foreground border-accent/20'
+        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
       case 'Member':
-        return 'bg-muted text-muted-foreground border-border'
+        return 'bg-muted text-foreground border-border'
     }
   }
 
@@ -256,7 +256,7 @@ export function MembersView({
           Back to Organizations
         </Button>
         <div className="flex items-center gap-3 mb-2">
-          <Users className="w-8 h-8 text-primary" />
+          <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
           <h1 className="text-3xl font-bold text-foreground">Members</h1>
         </div>
         <p className="text-muted-foreground">
@@ -266,33 +266,33 @@ export function MembersView({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-primary" onClick={() => setSelectedRole('All')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">All Members</p>
               <p className="text-2xl font-bold text-foreground">{roleCount.All}</p>
             </div>
-            <Users className="w-8 h-8 text-primary" />
+            <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-primary/50" onClick={() => setSelectedRole('Owner')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-amber-200 dark:hover:border-amber-800" onClick={() => setSelectedRole('Owner')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Owners</p>
-              <p className="text-2xl font-bold text-primary">{roleCount.Owner}</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{roleCount.Owner}</p>
             </div>
-            <Crown className="w-8 h-8 text-primary" />
+            <Crown className="w-8 h-8 text-amber-600 dark:text-amber-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-accent" onClick={() => setSelectedRole('Admin')}>
+        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('Admin')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Admins</p>
-              <p className="text-2xl font-bold text-accent-foreground">{roleCount.Admin}</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{roleCount.Admin}</p>
             </div>
-            <Shield className="w-8 h-8 text-accent-foreground" />
+            <Shield className="w-8 h-8 text-purple-600 dark:text-purple-400" />
           </div>
         </Card>
 
@@ -343,7 +343,7 @@ export function MembersView({
         </Card>
       ) : filteredMembers.length === 0 ? (
         <Card className="p-12 text-center">
-          <Users className="w-16 h-16 text-muted mx-auto mb-4" />
+          <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-foreground mb-2">No members found</h3>
           <p className="text-muted-foreground">
             {searchQuery || selectedRole !== 'All'
@@ -361,7 +361,7 @@ export function MembersView({
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
                   {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
                     {member.user.name.charAt(0).toUpperCase()}
                   </div>
 

@@ -194,6 +194,8 @@ export class OrganizationService {
     if (input.name !== undefined) updateData.name = input.name
     if (input.description !== undefined) updateData.description = input.description
     if (input.tag !== undefined) updateData.tag = input.tag
+    if (input.logo_url !== undefined) updateData.logo_url = input.logo_url
+    if (input.logo_storage_path !== undefined) updateData.logo_storage_path = input.logo_storage_path
 
     const { data, error } = await supabase
       .from('organizations')

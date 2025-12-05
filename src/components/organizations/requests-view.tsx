@@ -117,21 +117,21 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
     switch (status) {
       case 'pending':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border border-border">
             <Clock className="w-3 h-3" />
             Pending
           </span>
         )
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
             <CheckCircle className="w-3 h-3" />
             Approved
           </span>
         )
       case 'rejected':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
             <XCircle className="w-3 h-3" />
             Rejected
           </span>
@@ -154,10 +154,10 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
           Back to Organizations
         </Button>
         <div className="flex items-center gap-3 mb-2">
-          <UserPlus className="w-8 h-8 text-purple-600" />
-          <h1 className="text-3xl font-bold text-gray-900">Join Requests</h1>
+          <UserPlus className="w-8 h-8 text-primary" />
+          <h1 className="text-3xl font-bold text-foreground">Join Requests</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Managing join requests for <span className="font-semibold">{organization.name}</span>
         </p>
       </div>
@@ -166,61 +166,61 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card 
           className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${
-            selectedStatus === 'all' ? 'border-purple-500 bg-purple-50' : 'border-transparent'
+            selectedStatus === 'all' ? 'border-primary bg-primary/5' : 'border-transparent'
           }`}
           onClick={() => setSelectedStatus('all')}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">All Requests</p>
-              <p className="text-2xl font-bold text-gray-900">{statusCounts.all}</p>
+              <p className="text-sm text-muted-foreground">All Requests</p>
+              <p className="text-2xl font-bold text-foreground">{statusCounts.all}</p>
             </div>
-            <UserPlus className="w-8 h-8 text-purple-600" />
+            <UserPlus className="w-8 h-8 text-primary" />
           </div>
         </Card>
 
         <Card 
           className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${
-            selectedStatus === 'pending' ? 'border-yellow-500 bg-yellow-50' : 'border-transparent'
+            selectedStatus === 'pending' ? 'border-secondary bg-secondary/10' : 'border-transparent'
           }`}
           onClick={() => setSelectedStatus('pending')}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
+              <p className="text-sm text-muted-foreground">Pending</p>
+              <p className="text-2xl font-bold text-secondary-foreground">{statusCounts.pending}</p>
             </div>
-            <Clock className="w-8 h-8 text-yellow-600" />
+            <Clock className="w-8 h-8 text-secondary-foreground" />
           </div>
         </Card>
 
         <Card 
           className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${
-            selectedStatus === 'approved' ? 'border-green-500 bg-green-50' : 'border-transparent'
+            selectedStatus === 'approved' ? 'border-primary bg-primary/10' : 'border-transparent'
           }`}
           onClick={() => setSelectedStatus('approved')}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Approved</p>
-              <p className="text-2xl font-bold text-green-600">{statusCounts.approved}</p>
+              <p className="text-sm text-muted-foreground">Approved</p>
+              <p className="text-2xl font-bold text-primary">{statusCounts.approved}</p>
             </div>
-            <CheckCircle className="w-8 h-8 text-green-600" />
+            <CheckCircle className="w-8 h-8 text-primary" />
           </div>
         </Card>
 
         <Card 
           className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${
-            selectedStatus === 'rejected' ? 'border-red-500 bg-red-50' : 'border-transparent'
+            selectedStatus === 'rejected' ? 'border-destructive bg-destructive/10' : 'border-transparent'
           }`}
           onClick={() => setSelectedStatus('rejected')}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Rejected</p>
-              <p className="text-2xl font-bold text-red-600">{statusCounts.rejected}</p>
+              <p className="text-sm text-muted-foreground">Rejected</p>
+              <p className="text-2xl font-bold text-destructive">{statusCounts.rejected}</p>
             </div>
-            <XCircle className="w-8 h-8 text-red-600" />
+            <XCircle className="w-8 h-8 text-destructive" />
           </div>
         </Card>
       </div>
@@ -228,7 +228,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
       {/* Search */}
       <Card className="p-6 mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search by name or email..."
@@ -242,9 +242,9 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
       {/* Requests List */}
       {filteredRequests.length === 0 ? (
         <Card className="p-12 text-center">
-          <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No requests found</h3>
-          <p className="text-gray-600">
+          <AlertCircle className="w-16 h-16 text-muted mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-foreground mb-2">No requests found</h3>
+          <p className="text-muted-foreground">
             {searchQuery || selectedStatus !== 'all'
               ? 'Try adjusting your search or filter criteria.'
               : 'There are no join requests for this organization yet.'}
@@ -257,29 +257,29 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
                   {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-lg shrink-0">
                     {request.user.name.charAt(0).toUpperCase()}
                   </div>
 
                   {/* Request Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {request.user.name}
                       </h3>
                       {getStatusBadge(request.status)}
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Mail className="w-4 h-4" />
                         <span>{request.user.email}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <User className="w-4 h-4" />
                         <span className="capitalize">{request.user.user_type}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
                         <span>
                           Requested {new Date(request.requested_at).toLocaleDateString('en-US', {
@@ -292,7 +292,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
                         </span>
                       </div>
                       {request.reviewed_at && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-4 h-4" />
                           <span>
                             Reviewed {new Date(request.reviewed_at).toLocaleDateString('en-US', {
@@ -348,7 +348,7 @@ export function RequestsView({ organization, initialRequests, currentUserRole }:
       )}
 
       {/* Footer Info */}
-      <div className="mt-8 text-center text-sm text-gray-600">
+      <div className="mt-8 text-center text-sm text-muted-foreground">
         Showing {filteredRequests.length} of {requests.length} requests
       </div>
     </div>
