@@ -353,7 +353,7 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
                   <div className="shrink-0 flex items-start pt-1">
                     {org.is_member ? (
                       <Button
-                        onClick={() => router.push(`/organizations/${org.id}`)}
+                        onClick={() => router.push('/organizations')}
                         variant="outline"
                         className="border-primary/30 text-primary hover:bg-accent"
                       >
