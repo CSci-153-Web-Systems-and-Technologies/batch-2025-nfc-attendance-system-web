@@ -23,12 +23,12 @@ export function LogoutButton({ isExpanded = true }: LogoutButtonProps) {
     <Button 
       onClick={logout}
       variant="ghost"
-      className={`w-full justify-start gap-3 hover:bg-violet-100 ${
+      className={`w-full justify-start gap-3 hover:bg-accent ${
         !isExpanded ? 'px-2' : 'px-3'
       }`}
     >
-      <LogOut className="h-5 w-5 text-red-600 shrink-0" />
-      {isExpanded && <span className="text-sm text-gray-700">Logout</span>}
+      <LogOut className="h-5 w-5 text-destructive shrink-0" />
+      {isExpanded && <span className="text-sm text-foreground">Logout</span>}
     </Button>
   )
 }

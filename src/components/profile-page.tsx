@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label'
 import { useUserProfile } from '@/hooks/use-user-profile'
 import type { UserType } from '@/types/user'
 import type { OrganizationRole } from '@/types/organization'
+import { TagDisplayCard } from '@/components/user/tag-display-card'
+import { TagGenerator } from '@/components/user/tag-generator'
 
 interface UserMembership {
   role: OrganizationRole
@@ -36,11 +38,28 @@ export function ProfilePage() {
   const [memberships, setMemberships] = useState<UserMembership[]>([])
   const [membershipsLoading, setMembershipsLoading] = useState(true)
 
+  // Tag state
+  const [currentTagId, setCurrentTagId] = useState<string | null>(null)
+
   // Edit form state
   const [editName, setEditName] = useState('')
   const [editUserType, setEditUserType] = useState<UserType>('Student')
   const [editNfcTagId, setEditNfcTagId] = useState('')
   const [editQrCodeData, setEditQrCodeData] = useState('')
+
+  // Initialize tag state from user data
+  useEffect(() => {
+    if (user) {
+      setCurrentTagId(user.tag_id || null)
+    }
+  }, [user])
+
+  // Handle tag generation callback
+  const handleTagGenerated = (newTagId: string) => {
+    setCurrentTagId(newTagId)
+    // Refetch user to update the profile
+    refetch()
+  }
 
   // Fetch user memberships
   useEffect(() => {
@@ -186,26 +205,26 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-violet-50/30 py-8 px-4 md:px-8">
+    <div className="min-h-screen bg-muted/30 py-8 px-4 md:px-8">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Profile</h1>
-          <p className="text-gray-600 mt-1">Manage your account information</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Profile</h1>
+          <p className="text-muted-foreground mt-1">Manage your account information</p>
         </div>
 
         {/* Profile Card */}
         <Card>
-          <CardHeader className="border-b border-gray-100">
+          <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 {/* Avatar */}
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-avatar flex items-center justify-center">
                   <User className="h-8 w-8 md:h-10 md:w-10 text-white" />
                 </div>
                 <div>
                   <CardTitle className="text-xl md:text-2xl">{user.name}</CardTitle>
-                  <p className="text-sm text-gray-500 mt-1">{user.email}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
                 </div>
               </div>
               
@@ -396,6 +415,34 @@ export function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Tag Management Section */}
+        <div className="mt-6">
+          <h2 className="text-xl md:text-2xl font-bold text-foreground mb-4">
+            Attendance Tag Management
+          </h2>
+          <p className="text-muted-foreground mb-6">
+            Manage your NFC and QR code tags for attendance tracking
+          </p>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Tag Display & Writer Column */}
+            <div className="space-y-6">
+              <TagDisplayCard
+                tagId={currentTagId}
+                userName={user.name}
+              />
+            </div>
+
+            {/* Tag Generator Column */}
+            <div>
+              <TagGenerator
+                currentTagId={currentTagId}
+                onTagGenerated={handleTagGenerated}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

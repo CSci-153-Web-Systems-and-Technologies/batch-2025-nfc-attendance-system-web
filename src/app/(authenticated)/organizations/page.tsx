@@ -4,6 +4,9 @@ import { OrganizationService } from '@/lib/services/organization.service'
 import { UserService } from '@/lib/services/user.service'
 import { OrganizationMainView } from '@/components/organizations/organization-main-view'
 
+// Force dynamic rendering to always get fresh data
+export const dynamic = 'force-dynamic'
+
 export default async function OrganizationsPage() {
   const supabase = await createClient()
 

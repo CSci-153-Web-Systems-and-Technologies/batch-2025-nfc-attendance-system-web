@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LayoutDashboard, Users, User, LogOut, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, User, LogOut, Settings, Moon, Sun } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,8 @@ import {
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/client'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { getTheme, toggleTheme } from '@/lib/theme-client'
 
 // Menu items
 const navigationItems = [
@@ -42,6 +44,12 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { state } = useSidebar()
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const currentTheme = getTheme()
+    setTheme(currentTheme)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -53,6 +61,11 @@ export function AppSidebar() {
     }
   }
 
+  const handleThemeToggle = async () => {
+    const newTheme = await toggleTheme()
+    setTheme(newTheme)
+  }
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -60,7 +73,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground">
                   <LayoutDashboard className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
@@ -105,6 +118,14 @@ export function AppSidebar() {
                     <Settings />
                     <span>Settings</span>
                   </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              {/* Theme Toggle */}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleThemeToggle} className="w-full">
+                  {theme === 'dark' ? <Sun /> : <Moon />}
+                  <span>Theme</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

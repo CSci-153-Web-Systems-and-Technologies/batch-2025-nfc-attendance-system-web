@@ -3,6 +3,7 @@
 import { ArrowLeft, Menu } from 'lucide-react'
 import { Button } from './button'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from './theme-toggle'
 
 interface TopNavProps {
   showBack?: boolean
@@ -42,6 +43,10 @@ export function TopNav({ showBack, title, showMenu, onMenuClick }: TopNavProps) 
         {title && (
           <h1 className="text-lg font-medium text-foreground">{title}</h1>
         )}
+
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   )
