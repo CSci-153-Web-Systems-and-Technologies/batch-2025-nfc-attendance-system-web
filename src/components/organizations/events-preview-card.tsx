@@ -150,7 +150,7 @@ export function EventsPreviewCard({ organizationId, canManageEvents }: EventsPre
                       key={event.id}
                       event={event}
                       status="ongoing"
-                      onClick={() => router.push(`/events/${event.id}`)}
+                      onClick={() => router.push(`/organizations/${organizationId}/events/${event.id}`)}
                     />
                   ))}
                 </div>
@@ -174,7 +174,7 @@ export function EventsPreviewCard({ organizationId, canManageEvents }: EventsPre
                       key={event.id}
                       event={event}
                       status="upcoming"
-                      onClick={() => router.push(`/events/${event.id}`)}
+                      onClick={() => router.push(`/organizations/${organizationId}/events/${event.id}`)}
                     />
                   ))}
                 </div>
