@@ -217,7 +217,7 @@ export function SearchOrganizationsView({ userId }: SearchOrganizationsViewProps
                 placeholder="Search by organization name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch(true)}
                 className="w-full"
               />
             </div>
