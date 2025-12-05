@@ -47,16 +47,13 @@ export async function GET(request: NextRequest) {
     const maxMembers = searchParams.get('max_members') ? parseInt(searchParams.get('max_members')!) : undefined
     const excludeJoined = searchParams.get('exclude_joined') === 'true'
 
-    // Get user's organizations if we need to exclude them
-    let userOrgIds: string[] = []
-    if (excludeJoined) {
-      const { data: memberships } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
+    // Always get user's organizations to mark them as joined in results
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
 
-      userOrgIds = memberships?.map(m => m.organization_id) || []
-    }
+    const userOrgIds = memberships?.map(m => m.organization_id) || []
 
     // Get user's pending join requests
     const { data: pendingRequests } = await supabase
@@ -117,8 +114,9 @@ export async function GET(request: NextRequest) {
     // Process results: count members and apply member filters
     let results = organizations?.map(org => {
       // Count members from the relation
-      const memberCount = Array.isArray(org.organization_members) 
-        ? org.organization_members.length 
+      // When using (count) in select, Supabase returns [{count: N}]
+      const memberCount = Array.isArray(org.organization_members) && org.organization_members.length > 0
+        ? (org.organization_members[0] as { count: number })?.count ?? 0
         : 0
 
       // Remove the organization_members array from the result

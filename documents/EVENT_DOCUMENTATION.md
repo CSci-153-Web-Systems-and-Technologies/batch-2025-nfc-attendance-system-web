@@ -1,6 +1,6 @@
 # Event Feature Documentation
 
-**Last Updated:** November 6, 2025  
+**Last Updated:** November 19, 2025  
 **Status:** ✅ Production Ready
 
 ---
@@ -24,7 +24,25 @@ The Event feature allows organizations to create and manage events within the NF
 - **Event**: A scheduled gathering or activity organized by an organization
 - **Event Creator**: The user who created the event
 - **Event Permissions**: Based on organization membership roles
-- **Attendance Tracking**: Events serve as the basis for tracking member attendance (via NFC/QR)
+- **Attendance Tracking**: Events support attendance tracking via NFC, QR, or manual methods (see ATTENDANCE_DOCUMENTATION.md)
+- **Real-time Updates**: Attendance can be tracked in real-time using Supabase Realtime
+
+---
+
+## 🆕 Attendance Features (November 19, 2025)
+
+Events now support comprehensive attendance tracking with multiple scan methods:
+
+- **NFC Scanning**: Android Chrome users can tap NFC tags for instant attendance
+- **QR Code Scanning**: Cross-platform QR code scanning via camera
+- **Manual Entry**: Fallback method for technical issues
+- **Real-time Updates**: See attendance updates live as people check in
+- **Geolocation**: Optional location tracking for verification
+- **Statistics**: Attendance rate, scan method breakdown, attendee lists
+
+**For detailed attendance documentation, see:**
+- [Attendance Documentation](./ATTENDANCE_DOCUMENTATION.md)
+- [Tag Management Documentation](./TAG_MANAGEMENT_DOCUMENTATION.md)
 
 ---
 
@@ -42,7 +60,9 @@ CREATE TABLE events (
   location text,
   created_by uuid NOT NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
-  updated_at timestamp with time zone DEFAULT now() NOT NULL
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  event_start timestamp with time zone,
+  event_end timestamp with time zone
 );
 ```
 
@@ -56,6 +76,18 @@ CREATE TABLE events (
 - `created_by`: Reference to the user who created the event (required)
 - `created_at`: Timestamp when event was created (auto-generated)
 - `updated_at`: Timestamp when event was last updated (auto-updated via trigger)
+- `event_start`: Start of attendance window - when attendance tracking begins (optional, added Nov 20, 2025)
+- `event_end`: End of attendance window - when attendance tracking closes (optional, added Nov 20, 2025)
+
+**Attendance Window Fields (Added Nov 20, 2025):**
+- `event_start` and `event_end` are optional (nullable) fields that define when attendance can be taken
+- When both are `NULL`, the event is a **reminder-only event** with no attendance tracking
+- When set, attendance can **only be marked** between `event_start` and `event_end`
+- The `date` field remains as the event's scheduled date/time
+- Validation ensures `event_start` < `event_end` when both are provided
+- Both fields must be set together, or both left empty
+- Stored as ISO 8601 UTC timestamps in the database
+- Displayed in user's local timezone in the UI
 
 **Constraints:**
 - `PRIMARY KEY`: id
@@ -77,8 +109,10 @@ CREATE TABLE events (
 - `idx_events_name`: On event_name (for search functionality)
 - `idx_events_org_date`: Composite on (organization_id, date DESC) (optimized for org event lists)
 - `idx_events_name_lower`: On LOWER(event_name) (case-insensitive search, added Nov 6, 2025)
+- `idx_events_event_start`: On event_start (for attendance window queries, added Nov 20, 2025)
+- `idx_events_event_end`: On event_end (for attendance window queries, added Nov 20, 2025)
 
-**Total Indexes**: 8
+**Total Indexes**: 10
 
 **Triggers:**
 - `update_events_updated_at`: Auto-updates `updated_at` column on row modification
@@ -363,6 +397,95 @@ $$;
 Checks if a user can edit or delete an event. Returns true if:
 - User is the event creator, OR
 - User is Owner/Admin of the organization
+
+---
+
+## 🆕 Geolocation & Attendance Radius (Added Nov 24, 2025)
+
+### Purpose
+Provides optional precise event location (latitude/longitude) and an optional geofencing radius that restricts attendance marking to users physically within the defined area.
+
+### New Columns (events table)
+- `latitude double precision NULL` – Decimal degrees, valid range -90..90
+- `longitude double precision NULL` – Decimal degrees, valid range -180..180
+- `attendance_radius_meters integer NULL` – Restriction radius in meters (100–1000). NULL disables restriction.
+
+### Constraint
+```sql
+CHECK (
+  attendance_radius_meters IS NULL OR
+  (attendance_radius_meters >= 100 AND attendance_radius_meters <= 1000)
+)
+```
+
+### Indexes
+```sql
+CREATE INDEX IF NOT EXISTS idx_events_lat_long ON events(latitude, longitude);
+```
+
+### Usage Rules
+1. All three fields are optional; existing events remain unaffected.
+2. If `attendance_radius_meters` is set (NOT NULL), `latitude` and `longitude` MUST be provided.
+3. Frontend enforces this by requiring a pinned location before enabling radius toggle.
+4. Attendance marking requires browser geolocation. If permission denied, marking fails with clear error.
+
+### Attendance Enforcement Flow
+1. Client obtains current position (`navigator.geolocation.getCurrentPosition`).
+2. Sends `location_lat` and `location_lng` in POST `/api/attendance` request when radius restriction applies.
+3. Server (AttendanceService) fetches event, checks:
+   - Time window validity (existing logic).
+   - Presence of `attendance_radius_meters`, `latitude`, `longitude`.
+   - If set, computes distance using Haversine formula.
+   - Rejects if `distance > attendance_radius_meters` with message containing allowed radius and actual rounded distance.
+
+### Distance Calculation (Haversine)
+Defined in `src/lib/utils.ts`:
+```ts
+haversineDistanceMeters(lat1, lon1, lat2, lon2)
+```
+Earth radius constant: `6371000` meters.
+
+### API Changes
+- `POST /api/event` accepts optional: `latitude`, `longitude`, `attendance_radius_meters`.
+- Validation:
+  - Radius must be 100–1000.
+  - Lat/Long required if radius set.
+- `AttendanceService.markAttendance` now selects `latitude`, `longitude`, `attendance_radius_meters` and performs geofence check.
+
+### Frontend Additions
+- `MapPicker` component (Leaflet) for pin selection.
+- Extended `CreateEventForm` with:
+  - Toggle: Precise Map Location.
+  - Map display & manual lat/long edit fields.
+  - Toggle + range slider for Attendance Radius (100–1000m, default 250m).
+- `AttendanceScanner` requests location when event has radius restriction and passes coordinates.
+
+### Edge Cases & Handling
+| Case | Behavior |
+|------|----------|
+| Radius set, no lat/long | API 400 error on create (validation). |
+| Lat/long set, no radius | Allowed; precise location stored without restriction. |
+| Browser denies geolocation | Attendance marking aborted with client error. |
+| User outside radius | Server returns error with distance info. |
+| Distance exactly equal to radius | Allowed (<= comparison). |
+| Missing coordinates in restricted event | Server error: "Location required..." |
+
+### Future Enhancements (Suggested)
+- Reverse geocoding to auto-fill building/room.
+- Optional map preview on event detail page.
+- Heatmap of attendance scan points (if stored separately).
+- Support indoor positioning (BLE/WiFi) for finer granularity.
+
+### Testing Scenarios
+Add to `TESTING_CHECKLIST.md`:
+- Create event with location only (no radius) → attendance works anywhere.
+- Create event with radius 250m → inside vs. outside marking.
+- Adjust radius (e.g., 100m and 1000m extremes) and verify boundaries.
+- Deny geolocation permission and confirm error message.
+- Invalid lat/long input (UI should prevent, server rejects extremes).
+
+---
+
 
 ```sql
 CREATE OR REPLACE FUNCTION can_manage_event(
@@ -883,14 +1006,23 @@ export interface EventQueryOptions extends EventFilters {
 - Filter by date range
 - Upcoming vs past event filtering
 
-### 6. Organization Integration
+### 6. Attendance Window Management (Added Nov 20, 2025)
+- **Optional attendance tracking**: Events can have `event_start` and `event_end` fields
+- **Reminder-only events**: Leave both fields empty for events without attendance tracking
+- **Time-based validation**: Attendance can only be marked between `event_start` and `event_end`
+- **User-friendly error messages**: Clear feedback when attendance is attempted outside the window
+  - Before window: "Attendance has not started yet. Please try again after [formatted local time]"
+  - After window: "Attendance period has ended. The deadline was [formatted local time]"
+- **Validation**: Ensures `event_start` < `event_end` when both are provided
+- **Database-level enforcement**: Attendance service validates time window before allowing submissions
+
+### 7. Organization Integration
 - Events tied to specific organizations
 - Only organization members can view events
 - Cascade delete when organization deleted
 - Organization context in event display
 
-### 7. Future Features (Planned)
-- **Attendance Tracking**: NFC/QR code check-in
+### 8. Future Features (Planned)
 - **Attendance Reports**: Export attendance data
 - **Event Notifications**: Remind members of upcoming events
 - **Recurring Events**: Create repeating events

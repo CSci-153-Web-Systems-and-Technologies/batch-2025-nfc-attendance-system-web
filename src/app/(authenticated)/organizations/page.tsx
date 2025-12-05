@@ -4,6 +4,9 @@ import { OrganizationService } from '@/lib/services/organization.service'
 import { UserService } from '@/lib/services/user.service'
 import { OrganizationMainView } from '@/components/organizations/organization-main-view'
 
+// Force dynamic rendering to always get fresh data
+export const dynamic = 'force-dynamic'
+
 export default async function OrganizationsPage() {
   const supabase = await createClient()
 
@@ -26,7 +29,7 @@ export default async function OrganizationsPage() {
   const organizations = await OrganizationService.getUserOrganizations(supabase, user.id)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-background">
       <OrganizationMainView organizations={organizations} />
     </div>
   )

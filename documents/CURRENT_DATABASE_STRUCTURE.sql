@@ -1,29 +1,71 @@
 -- ============================================================================
 -- CURRENT DATABASE STRUCTURE - EXPORT SNAPSHOT
 -- ============================================================================
--- Date: November 1, 2025 (Updated with join requests feature)
+-- Date: December 2, 2025 (Updated with guest attendance and Excel export)
 -- Database: NFC Attendance System
 -- This file contains the complete current state of the database
--- Status: ✅ ACTIVE - Join Request System Implemented
+-- Status: ✅ ACTIVE - Guest Attendance + Excel Export
+-- ============================================================================
+--
+-- REQUIRED SQL UPDATES:
+-- Run these commands in Supabase SQL Editor to enable members list view:
+--
+-- 1. Allow members to view other members in same organization:
+--    CREATE POLICY members_can_view_other_members
+--    ON organization_members FOR SELECT
+--    USING (is_org_member(organization_id, auth.uid()));
+--
+-- 2. Allow admins to update member roles (with restrictions):
+--    CREATE POLICY admins_can_update_members
+--    ON organization_members FOR UPDATE
+--    USING (
+--      is_org_admin(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    )
+--    WITH CHECK (
+--      is_org_admin(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    );
+--
+-- 3. Tighten owner update policy:
+--    DROP POLICY IF EXISTS update_members_by_owner ON organization_members;
+--    CREATE POLICY update_members_by_owner
+--    ON organization_members FOR UPDATE
+--    USING (
+--      is_org_owner(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    )
+--    WITH CHECK (
+--      is_org_owner(organization_id, auth.uid())
+--      AND role <> 'Owner'
+--      AND user_id <> auth.uid()
+--    );
+--
 -- ============================================================================
 
 -- ============================================================================
 -- TABLES OVERVIEW
 -- ============================================================================
--- Base Tables: 5
--- Views: 2
--- Total Tables: 7
+-- Base Tables: 6
+-- Views: 4
+-- Total Tables: 10
 
 /*
 TABLE NAME                    | TYPE
 ------------------------------|------------
+event_attendance              | BASE TABLE
 events                        | BASE TABLE
 organization_join_requests    | BASE TABLE
-membership_with_organization  | VIEW
-membership_with_user          | VIEW
 organization_members          | BASE TABLE
 organizations                 | BASE TABLE
 users                         | BASE TABLE
+attendance_with_details       | VIEW
+event_attendance_summary      | VIEW
+membership_with_organization  | VIEW
+membership_with_user          | VIEW
 */
 
 -- ============================================================================
@@ -45,6 +87,37 @@ location         | text                    | YES      | null             | 6
 created_by       | uuid                    | NO       | null             | 7
 created_at       | timestamp with timezone | NO       | now()            | 8
 updated_at       | timestamp with timezone | NO       | now()            | 9
+event_start      | timestamp with timezone | YES      | null             | 10
+event_end        | timestamp with timezone | YES      | null             | 11
+
+NOTE: event_start and event_end define the attendance window (when attendance can be taken).
+      Both are nullable - if null, the event is reminder-only with no attendance tracking.
+      When set, attendance can only be marked between event_start and event_end.
+      The 'date' field remains as the event's scheduled date/time.
+*/
+
+-- TABLE: event_attendance
+-- Description: Stores attendance records for events (supports members and guests)
+-- Rows: 0
+/*
+COLUMN NAME      | DATA TYPE               | NULLABLE | DEFAULT          | POSITION
+-----------------|-------------------------|----------|------------------|----------
+id               | uuid                    | NO       | gen_random_uuid()| 1
+event_id         | uuid                    | NO       | null             | 2
+user_id          | uuid                    | NO       | null             | 3
+marked_at        | timestamp with timezone | NO       | now()            | 4
+marked_by        | uuid                    | NO       | null             | 5
+scan_method      | text                    | NO       | null             | 6
+location_lat     | decimal(10,8)           | YES      | null             | 7
+location_lng     | decimal(11,8)           | YES      | null             | 8
+notes            | text                    | YES      | null             | 9
+is_member        | boolean                 | NO       | true             | 10
+created_at       | timestamp with timezone | NO       | now()            | 11
+updated_at       | timestamp with timezone | NO       | now()            | 12
+
+NOTE: is_member indicates if the attendee was a member of the organization at time of attendance.
+      FALSE = guest/non-member. This allows tracking attendance for non-org members.
+      scan_method can be 'NFC', 'QR', or 'Manual'.
 */
 
 -- TABLE: organization_join_requests
@@ -82,15 +155,23 @@ updated_at       | timestamp with timezone | NO       | now()            | 6
 -- Description: Stores organization information
 -- Rows: 3
 /*
-COLUMN NAME      | DATA TYPE               | NULLABLE | DEFAULT          | POSITION
------------------|-------------------------|----------|------------------|----------
-id               | uuid                    | NO       | gen_random_uuid()| 1
-name             | text                    | NO       | null             | 2
-description      | text                    | YES      | null             | 3
-owner_user_id    | uuid                    | NO       | null             | 4
-created_at       | timestamp with timezone | NO       | now()            | 5
-updated_at       | timestamp with timezone | NO       | now()            | 6
-tag              | text                    | YES      | null             | 7
+COLUMN NAME       | DATA TYPE               | NULLABLE | DEFAULT          | POSITION
+------------------|-------------------------|----------|------------------|----------
+id                | uuid                    | NO       | gen_random_uuid()| 1
+name              | text                    | NO       | null             | 2
+description       | text                    | YES      | null             | 3
+owner_user_id     | uuid                    | NO       | null             | 4
+created_at        | timestamp with timezone | NO       | now()            | 5
+updated_at        | timestamp with timezone | NO       | now()            | 6
+tag               | text                    | YES      | null             | 7
+logo_url          | text                    | YES      | null             | 8
+logo_storage_path | text                    | YES      | null             | 9
+
+NOTE: logo_url is the public URL for the organization's logo/profile picture.
+      logo_storage_path is the storage bucket path for deletion (format: {org_id}/logo/{timestamp}-{filename}).
+      Both are nullable - organizations don't require a logo.
+      Logos are stored in the 'organization-files' Supabase storage bucket.
+      File constraints: 5MB max, JPEG/PNG only, 1:1 square aspect ratio recommended.
 */
 
 -- TABLE: users
@@ -118,6 +199,9 @@ has_password             | boolean                 | NO       | false           
 /*
 FROM TABLE                | FROM COLUMN     | TO TABLE      | TO COLUMN | CONSTRAINT NAME      | UPDATE RULE | DELETE RULE
 --------------------------|-----------------|---------------|-----------|----------------------|-------------|-------------
+event_attendance          | event_id        | events        | id        | fk_event             | NO ACTION   | CASCADE
+event_attendance          | user_id         | users         | id        | fk_user              | NO ACTION   | CASCADE
+event_attendance          | marked_by       | users         | id        | fk_marked_by         | NO ACTION   | CASCADE
 events                    | created_by      | users         | id        | fk_created_by_user   | NO ACTION   | CASCADE
 events                    | organization_id | organizations | id        | fk_organization      | NO ACTION   | CASCADE
 organization_join_requests| organization_id | organizations | id        | fk_organization      | NO ACTION   | CASCADE
@@ -135,6 +219,8 @@ organizations             | owner_user_id   | users         | id        | fk_own
 /*
 TABLE NAME                | CONSTRAINT NAME              | TYPE        | COLUMNS
 --------------------------|------------------------------|-------------|-------------------------
+event_attendance          | event_attendance_pkey        | PRIMARY KEY | id
+event_attendance          | unique_event_user            | UNIQUE      | event_id, user_id
 events                    | events_pkey                  | PRIMARY KEY | id
 organization_join_requests| organization_join_requests_pkey| PRIMARY KEY| id
 organization_join_requests| unique_pending_request       | UNIQUE      | organization_id, user_id
@@ -155,6 +241,10 @@ users                     | users_qr_code_data_key       | UNIQUE      | qr_code
 /*
 TABLE NAME                | CONSTRAINT NAME                       | CHECK CLAUSE
 --------------------------|---------------------------------------|--------------------------------------------------
+event_attendance          | valid_scan_method                     | scan_method IN ('NFC', 'QR', 'Manual')
+event_attendance          | valid_latitude                        | location_lat BETWEEN -90 AND 90
+event_attendance          | valid_longitude                       | location_lng BETWEEN -180 AND 180
+event_attendance          | notes_length                          | length(notes) <= 1000
 events                    | Multiple NOT NULL constraints         | Various columns must not be null
 organization_join_requests| Multiple NOT NULL constraints         | Various columns must not be null
 organization_join_requests| organization_join_requests_status_check| status IN ('pending', 'approved', 'rejected')
@@ -173,6 +263,15 @@ users                     | users_user_type_check                 | user_type IN
 /*
 TABLE NAME                | INDEX NAME                              | INDEX DEFINITION
 --------------------------|-----------------------------------------|--------------------------------------------------------
+event_attendance          | event_attendance_pkey                   | UNIQUE on id
+event_attendance          | unique_event_user                       | UNIQUE on event_id, user_id
+event_attendance          | idx_attendance_event_id                 | event_id
+event_attendance          | idx_attendance_user_id                  | user_id
+event_attendance          | idx_attendance_marked_at                | marked_at DESC
+event_attendance          | idx_attendance_marked_by                | marked_by
+event_attendance          | idx_attendance_event_marked_at          | event_id, marked_at DESC
+event_attendance          | idx_attendance_scan_method              | scan_method
+
 events                    | events_pkey                             | UNIQUE on id
 events                    | idx_events_created_at                   | created_at DESC
 events                    | idx_events_created_by                   | created_by
@@ -220,6 +319,7 @@ users                     | idx_users_user_type                     | user_type
 /*
 TABLE NAME                | RLS ENABLED
 --------------------------|-------------
+event_attendance          | TRUE
 events                    | TRUE
 organization_join_requests| TRUE
 organization_members      | TRUE
@@ -230,8 +330,18 @@ users                     | TRUE
 -- ============================================================================
 -- RLS POLICIES (Security Rules) - UPDATED
 -- ============================================================================
--- Total Policies: 23
--- Status: ✅ Active with Join Request System
+-- Total Policies: 29
+-- Status: ✅ Active with Guest Attendance Support
+
+-- EVENT_ATTENDANCE TABLE POLICIES (4 policies)
+/*
+POLICY NAME                                      | OPERATION | DESCRIPTION
+-------------------------------------------------|-----------|--------------------------------------------------------
+members_can_view_org_event_attendance            | SELECT    | Members can view attendance for events in their org
+attendance_takers_can_create_attendance          | INSERT    | Attendance Takers/Admins/Owners can mark attendance
+admins_can_delete_attendance                     | DELETE    | Admins and Owners can delete attendance records
+admins_can_update_attendance                     | UPDATE    | Admins and Owners can update attendance records
+*/
 
 -- EVENTS TABLE POLICIES (6 policies)
 /*
@@ -256,14 +366,16 @@ users_can_delete_own_pending_requests            | DELETE    | Users can delete 
 users_can_view_own_requests                      | SELECT    | Users can view their own requests
 */
 
--- ORGANIZATION_MEMBERS TABLE POLICIES (4 policies)
+-- ORGANIZATION_MEMBERS TABLE POLICIES (6 policies)
 /*
 POLICY NAME                                      | OPERATION | DESCRIPTION
 -------------------------------------------------|-----------|--------------------------------------------------------
 delete_members                                   | DELETE    | Users can leave orgs, owners can remove members
 insert_members_by_owner_or_admin                 | INSERT    | Owners/Admins can add members
 select_own_memberships                           | SELECT    | Users can view their own memberships
-update_members_by_owner                          | UPDATE    | Owners can update member roles
+members_can_view_other_members                   | SELECT    | Members can view other members in same organization
+admins_can_update_members                        | UPDATE    | Admins can update member roles (non-owner, no self-modify)
+update_members_by_owner                          | UPDATE    | Owners can update member roles (non-owner, no self-modify)
 */
 
 -- ORGANIZATIONS TABLE POLICIES (4 policies)
@@ -310,13 +422,18 @@ update_users_updated_at              | UPDATE | users                     | upda
 FUNCTION NAME                       | RETURN TYPE | ARGUMENTS                               | TYPE
 ------------------------------------|-------------|-----------------------------------------|----------
 approve_join_request                | boolean     | p_request_id uuid, p_reviewer_id uuid   | function
+can_take_attendance                 | boolean     | p_event_id uuid, p_user_id uuid         | function
 check_single_owner                  | trigger     | (none)                                  | function
+get_event_attendance_count          | integer     | p_event_id uuid                         | function
+get_event_member_count              | integer     | p_event_id uuid                         | function
 get_organization_member_count       | integer     | p_organization_id uuid                  | function
 get_user_membership_count           | integer     | p_user_id uuid                          | function
 get_user_role_in_organization       | text        | p_user_id uuid, p_organization_id uuid  | function
 is_org_admin                        | boolean     | org_id uuid, user_auth_id uuid          | function
 is_org_member                       | boolean     | org_id uuid, user_auth_id uuid          | function
 is_org_owner                        | boolean     | org_id uuid, user_auth_id uuid          | function
+is_user_attended                    | boolean     | p_event_id uuid, p_user_id uuid         | function
+mark_attendance                     | json        | p_event_id uuid, p_user_id uuid, p_marked_by uuid, p_scan_method text, ... | function
 mark_user_password_set              | trigger     | (none)                                  | function
 update_updated_at_column            | trigger     | (none)                                  | function
 user_can_reset_password             | boolean     | user_email text                         | function
@@ -425,6 +542,50 @@ events (0 rows)
 -- VIEWS (Helper Queries)
 -- ============================================================================
 
+-- VIEW: attendance_with_details
+-- Purpose: Complete attendance records with user, event, and organization details
+/*
+DEFINITION:
+SELECT 
+    ea.id, ea.event_id, ea.user_id, ea.marked_at, ea.marked_by,
+    ea.scan_method, ea.location_lat, ea.location_lng, ea.notes,
+    ea.is_member, ea.created_at, ea.updated_at,
+    u.name AS user_name, u.email AS user_email, u.user_type,
+    e.event_name, e.date AS event_date, e.location AS event_location,
+    e.organization_id, o.name AS organization_name,
+    mb.name AS marked_by_name, mb.email AS marked_by_email
+FROM event_attendance ea
+JOIN users u ON ea.user_id = u.id
+JOIN events e ON ea.event_id = e.id
+JOIN organizations o ON e.organization_id = o.id
+JOIN users mb ON ea.marked_by = mb.id;
+*/
+
+-- VIEW: event_attendance_summary
+-- Purpose: Summary statistics for event attendance including member/guest counts
+/*
+DEFINITION:
+SELECT 
+    e.id AS event_id, e.event_name, e.date AS event_date,
+    e.organization_id, o.name AS organization_name,
+    COALESCE(att.total_attended, 0) AS total_attended,
+    COALESCE(mem.total_members, 0) AS total_members,
+    CASE 
+        WHEN COALESCE(mem.total_members, 0) = 0 THEN 0
+        ELSE ROUND((COALESCE(att.total_attended, 0)::DECIMAL / mem.total_members) * 100, 1)
+    END AS attendance_percentage,
+    COALESCE(att.nfc_scans, 0) AS nfc_scans,
+    COALESCE(att.qr_scans, 0) AS qr_scans,
+    COALESCE(att.manual_entries, 0) AS manual_entries,
+    COALESCE(att.member_count, 0) AS member_count,
+    COALESCE(att.non_member_count, 0) AS non_member_count,
+    att.last_attendance_marked
+FROM events e
+JOIN organizations o ON e.organization_id = o.id
+LEFT JOIN (aggregated attendance stats) att ON e.id = att.event_id
+LEFT JOIN (member counts) mem ON e.organization_id = mem.organization_id;
+*/
+
 -- VIEW: membership_with_organization
 -- Purpose: Joins organization_members with organizations for easy querying
 /*
@@ -461,57 +622,120 @@ FROM (organization_members om
     JOIN users u ON ((om.user_id = u.id)));
 */
 
+-- FUNCTION: confirm_tag_update
+-- Description: Updates tag ID and records write history if cooldown period has elapsed
+CREATE OR REPLACE FUNCTION confirm_tag_update(p_user_id UUID, p_tag_id TEXT)
+RETURNS JSON AS $$
+DECLARE
+    v_can_write_result JSON;
+    v_can_write BOOLEAN;
+    v_write_record_id UUID;
+BEGIN
+    -- Check if user can write a new tag
+    v_can_write_result := can_user_write_tag(p_user_id);
+    v_can_write := (v_can_write_result->>'can_write')::BOOLEAN;
+    
+    IF NOT v_can_write THEN
+        RAISE EXCEPTION 'Cannot write tag. Cooldown period not elapsed. Next available: %', 
+            v_can_write_result->>'next_available_date';
+    END IF;
+    
+    -- Update user's tag_id
+    UPDATE users 
+    SET tag_id = p_tag_id,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    -- Record the tag write in history
+    INSERT INTO user_tag_writes (user_id, tag_id, written_at)
+    VALUES (p_user_id, p_tag_id, NOW())
+    RETURNING id INTO v_write_record_id;
+    
+    RETURN json_build_object(
+        'success', TRUE,
+        'tag_id', p_tag_id,
+        'write_record_id', v_write_record_id,
+        'written_at', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION confirm_tag_update IS 'Updates tag ID and records write history if cooldown period has elapsed';
+
 -- ============================================================================
 -- SUMMARY
 -- ============================================================================
 /*
-✅ DATABASE IS FULLY OPERATIONAL WITH JOIN REQUEST SYSTEM
+✅ DATABASE IS FULLY OPERATIONAL WITH GUEST ATTENDANCE & EXCEL EXPORT
 
 Status Summary:
 - All required tables exist and populated with test data
 - All foreign keys configured correctly
-- RLS policies active and secure (23 policies)
+- RLS policies active and secure (29 policies)
 - Indexes optimized for performance
 - Helper functions available
 - Auto-update triggers working
 - Join request workflow implemented
+- Guest attendance support added
+- Excel export available for Admin/Owner
+- Organization logo upload support added
 
-Recent Updates (November 1, 2025):
+Recent Updates (December 2, 2025):
+✅ Added logo_url column to organizations table (nullable text)
+✅ Added logo_storage_path column to organizations table (nullable text)
+✅ Created 'organization-files' storage bucket for organization logos
+✅ Added RLS policies for organization-files bucket (authenticated read, owner/admin write/delete)
+✅ Logo constraints: 5MB max, JPEG/PNG only, 1:1 square aspect ratio recommended
+
+Previous Updates (December 2, 2025):
+✅ Added is_member column to event_attendance table
+✅ Updated mark_attendance function to support non-members (guests)
+✅ Updated event_attendance_summary view with member_count and non_member_count
+✅ Updated attendance_with_details view to include is_member field
+✅ Added Excel export API for attendance records (Admin/Owner only)
+✅ Added user search API for manual attendance entry
+
+Previous Updates (November 1, 2025):
 ✅ Added organization_join_requests table
 ✅ Added organization tag system (unique identifier)
 ✅ Added user authentication provider tracking
 ✅ Added password management system
 ✅ New functions: approve_join_request, user_can_reset_password, mark_user_password_set
 ✅ Updated user_type constraints (removed 'Admin', now only 'Student', 'Faculty')
-✅ Database now contains 3 users, 3 organizations, 3 memberships
 
-Current Data:
-- 3 active users (up from 1)
-- 3 active organizations (up from 0)
-- 3 active memberships (up from 0)
-- Join request system ready for use
-- Event system ready for use
-
-Table Summary (5 base tables, 2 views):
+Table Summary (6 base tables, 4 views):
 1. users - User profiles with auth provider tracking
-2. organizations - Organization management with tags
+2. organizations - Organization management with tags and logos
 3. organization_members - Membership management
-4. organization_join_requests - Join request workflow (NEW)
+4. organization_join_requests - Join request workflow
 5. events - Event management
-6. membership_with_organization (VIEW)
-7. membership_with_user (VIEW)
+6. event_attendance - Attendance records with guest support
+7. attendance_with_details (VIEW) - Full attendance details
+8. event_attendance_summary (VIEW) - Attendance statistics
+9. membership_with_organization (VIEW)
+10. membership_with_user (VIEW)
 
-Policy Summary (23 total):
+Storage Buckets:
+1. organization-files - Organization logos/profile pictures
+
+Policy Summary (29+ total):
+- event_attendance: 4 policies
 - events: 6 policies
-- organization_join_requests: 5 policies (NEW)
-- organization_members: 4 policies
+- organization_join_requests: 5 policies
+- organization_members: 6 policies
 - organizations: 4 policies
 - users: 4 policies
+- organization-files (storage): 4 policies (read/insert/update/delete)
 
-Function Summary (13 total):
-- approve_join_request (NEW)
-- mark_user_password_set (NEW)
-- user_can_reset_password (NEW)
+Function Summary (18 total):
+- mark_attendance (UPDATED - supports guests)
+- can_take_attendance
+- is_user_attended
+- get_event_attendance_count
+- get_event_member_count
+- approve_join_request
+- mark_user_password_set
+- user_can_reset_password
 - check_single_owner
 - get_organization_member_count
 - get_user_membership_count
@@ -524,18 +748,11 @@ Function Summary (13 total):
 - user_has_role
 
 Performance Metrics:
-- Total database size: 12 MB
+- Total database size: ~15 MB
 - All tables properly indexed
 - RLS enabled on all tables
 - Optimized for read-heavy workloads
 
-Next Steps:
-1. ✅ Continue testing join request workflow
-2. ✅ Test organization search by tag
-3. ✅ Create events for organizations
-4. ✅ Monitor database performance
-5. ✅ Test authentication providers
-
-Last Updated: November 1, 2025
+Last Updated: December 2, 2025
 Updated By: Database Structure Export
 */

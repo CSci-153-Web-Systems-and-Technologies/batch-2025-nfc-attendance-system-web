@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { MembershipService } from '@/lib/services/membership.service'
 import { createClient } from '@/lib/server'
+import type { MembershipRole } from '@/types/membership'
 
 /**
  * GET /api/membership/organization/[organizationId]
@@ -8,7 +9,7 @@ import { createClient } from '@/lib/server'
  */
 export async function GET(
   request: Request,
-  { params }: { params: { organizationId: string } }
+  { params }: { params: Promise<{ organizationId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -19,8 +20,15 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { searchParams } = new URL(request.url)
+    const limitParam = searchParams.get('limit')
+    const offsetParam = searchParams.get('offset')
+    const roleParam = searchParams.get('role') as MembershipRole | null
 
-    const organizationId = params.organizationId
+    const limit = Math.min(Number(limitParam ?? 20), 50)
+    const offset = Number(offsetParam ?? 0)
+
+    const { organizationId } = await params
 
     // Check if user is a member of the organization
     const userMembership = await MembershipService.getUserMembershipInOrganization(
@@ -35,11 +43,22 @@ export async function GET(
       )
     }
 
-    const members = await MembershipService.getOrganizationMembers(
-      organizationId
+    const members = await MembershipService.getOrganizationMembersPaged(
+      organizationId,
+      {
+        limit,
+        offset,
+        role: roleParam ?? undefined,
+      }
     )
 
-    return NextResponse.json({ members }, { status: 200 })
+    // Get total count (respect role filter)
+    const total = await MembershipService.countMemberships({
+      organization_id: organizationId,
+      role: roleParam ?? undefined,
+    })
+
+    return NextResponse.json({ members, total }, { status: 200 })
   } catch (error) {
     console.error('Error fetching organization members:', error)
     return NextResponse.json(

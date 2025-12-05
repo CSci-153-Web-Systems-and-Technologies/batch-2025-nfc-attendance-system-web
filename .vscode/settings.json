@@ -1,8 +1,15 @@
 {
     "cSpell.words": [
+        "cooldown",
+        "cooldowns",
+        "desync",
+        "desynchronization",
+        "geolocation",
         "pkey",
         "plpgsql",
         "psql",
+        "qrcode",
+        "shadcn",
         "signup",
         "signups"
     ]
