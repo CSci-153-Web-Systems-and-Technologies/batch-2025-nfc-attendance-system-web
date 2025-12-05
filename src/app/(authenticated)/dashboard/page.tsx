@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Calendar, X, Sparkles, Clock } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Calendar, X, Sparkles, Clock, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useUserProfile } from '@/hooks/use-user-profile'
@@ -63,14 +63,86 @@ const formatEventDate = (dateString: string): string => {
   return eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+const PAGE_SIZE = 10
+
+// Custom hook for infinite scroll events
+function useEventList(eventType: 'ongoing' | 'upcoming' | 'past') {
+  const [events, setEvents] = useState<DashboardEvent[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  const hasMore = events.length < total
+
+  const fetchEvents = useCallback(async (reset: boolean = false) => {
+    try {
+      const effectiveOffset = reset ? 0 : offset
+      const queryParam = eventType === 'ongoing' ? 'ongoing' : eventType === 'upcoming' ? 'upcoming' : 'past'
+      const res = await fetch(`/api/event?${queryParam}=true&limit=${PAGE_SIZE}&offset=${effectiveOffset}`, { cache: 'no-store' })
+      
+      if (!res.ok) throw new Error(`Failed to load ${eventType} events`)
+      
+      const data = await res.json()
+      const newEvents: DashboardEvent[] = data.events || []
+      
+      if (reset) {
+        setEvents(newEvents)
+        setOffset(newEvents.length)
+      } else {
+        setEvents(prev => [...prev, ...newEvents])
+        setOffset(prev => prev + newEvents.length)
+      }
+      
+      setTotal(data.pagination?.total || 0)
+      setError(null)
+    } catch (err: any) {
+      setError(err.message || `Failed to load ${eventType} events`)
+    }
+  }, [eventType, offset])
+
+  // Initial fetch
+  useEffect(() => {
+    setIsLoading(true)
+    fetchEvents(true).finally(() => setIsLoading(false))
+  }, [eventType])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const element = loadMoreRef.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading && !isLoadingMore && hasMore) {
+          setIsLoadingMore(true)
+          fetchEvents(false).finally(() => setIsLoadingMore(false))
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(element)
+    return () => observer.unobserve(element)
+  }, [hasMore, isLoading, isLoadingMore, fetchEvents])
+
+  return { events, total, isLoading, isLoadingMore, loadMoreRef, hasMore, error }
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loading: userLoading } = useUserProfile()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [onGoing, setOnGoing] = useState<DashboardEvent[]>([])
-  const [upcoming, setUpcoming] = useState<DashboardEvent[]>([])
-  const [finished, setFinished] = useState<DashboardEvent[]>([])
+  
+  // Use infinite scroll hooks for each event type
+  const ongoingList = useEventList('ongoing')
+  const upcomingList = useEventList('upcoming')
+  const pastList = useEventList('past')
+  
+  // Combined loading state for initial load
+  const loading = ongoingList.isLoading || upcomingList.isLoading || pastList.isLoading
+  const error = ongoingList.error || upcomingList.error || pastList.error
   
   // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -78,47 +150,6 @@ export default function DashboardPage() {
   
   // Get first name for greeting
   const firstName = user?.name?.split(' ')[0] || 'there'
-
-  // Fetch events for dashboard
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const [ongoingRes, upcomingRes, pastRes] = await Promise.all([
-          fetch('/api/event?ongoing=true&limit=20', { cache: 'no-store' }),
-          fetch('/api/event?upcoming=true&limit=20', { cache: 'no-store' }),
-          fetch('/api/event?past=true&limit=20', { cache: 'no-store' }),
-        ])
-
-        if (!ongoingRes.ok) {
-          throw new Error('Failed to load ongoing events')
-        }
-        if (!upcomingRes.ok) {
-          throw new Error('Failed to load upcoming events')
-        }
-        if (!pastRes.ok) {
-          throw new Error('Failed to load past events')
-        }
-
-        const ongoingData: DashboardEvent[] = await ongoingRes.json()
-        const upcomingData: DashboardEvent[] = await upcomingRes.json()
-        const pastData: DashboardEvent[] = await pastRes.json()
-
-        setOnGoing(ongoingData)
-        setUpcoming(upcomingData)
-        setFinished(pastData)
-      } catch (err: any) {
-        console.error('Dashboard events load error:', err)
-        setError(err.message || 'Failed to load events')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchEvents()
-  }, [])
 
   // Build event date map for calendar indicators
   const eventDateMap = useMemo(() => {
@@ -134,12 +165,12 @@ export default function DashboardPage() {
       })
     }
     
-    addToMap(onGoing, 'ongoing')
-    addToMap(upcoming, 'upcoming')
-    addToMap(finished, 'past')
+    addToMap(ongoingList.events, 'ongoing')
+    addToMap(upcomingList.events, 'upcoming')
+    addToMap(pastList.events, 'past')
     
     return map
-  }, [onGoing, upcoming, finished])
+  }, [ongoingList.events, upcomingList.events, pastList.events])
 
   // Filter events based on selected date
   const filterEventsByDate = (events: DashboardEvent[]): DashboardEvent[] => {
@@ -147,9 +178,9 @@ export default function DashboardPage() {
     return events.filter(event => formatDateKey(new Date(event.date)) === selectedDate)
   }
 
-  const filteredOngoing = filterEventsByDate(onGoing)
-  const filteredUpcoming = filterEventsByDate(upcoming)
-  const filteredPast = filterEventsByDate(finished)
+  const filteredOngoing = filterEventsByDate(ongoingList.events)
+  const filteredUpcoming = filterEventsByDate(upcomingList.events)
+  const filteredPast = filterEventsByDate(pastList.events)
 
   // Format selected date for display
   const formatSelectedDateDisplay = (dateKey: string): string => {
@@ -241,9 +272,9 @@ export default function DashboardPage() {
                 <div className="text-sm text-muted-foreground">
                   {loading ? (
                     <span className="inline-block w-48 h-4 bg-muted animate-pulse rounded" />
-                  ) : onGoing.length > 0 ? (
+                  ) : ongoingList.events.length > 0 ? (
                     <button
-                      onClick={() => router.push(`/organizations/${onGoing[0].organization_id}/events/${onGoing[0].id}`)}
+                      onClick={() => router.push(`/organizations/${ongoingList.events[0].organization_id}/events/${ongoingList.events[0].id}`)}
                       className="flex items-center gap-2 hover:text-foreground transition-colors group"
                     >
                       <span className="relative flex h-2 w-2">
@@ -252,22 +283,22 @@ export default function DashboardPage() {
                       </span>
                       <span>
                         <span className="font-medium text-green-600 dark:text-green-400">Live now:</span>{' '}
-                        <span className="group-hover:underline">{onGoing[0].event_name}</span>
-                        {onGoing.length > 1 && (
-                          <span className="text-muted-foreground"> +{onGoing.length - 1} more</span>
+                        <span className="group-hover:underline">{ongoingList.events[0].event_name}</span>
+                        {ongoingList.events.length > 1 && (
+                          <span className="text-muted-foreground"> +{ongoingList.events.length - 1} more</span>
                         )}
                       </span>
                     </button>
-                  ) : upcoming.length > 0 ? (
+                  ) : upcomingList.events.length > 0 ? (
                     <button
-                      onClick={() => router.push(`/organizations/${upcoming[0].organization_id}/events/${upcoming[0].id}`)}
+                      onClick={() => router.push(`/organizations/${upcomingList.events[0].organization_id}/events/${upcomingList.events[0].id}`)}
                       className="flex items-center gap-2 hover:text-foreground transition-colors group"
                     >
                       <Clock className="h-3.5 w-3.5 text-blue-500" />
                       <span>
                         <span className="font-medium text-blue-600 dark:text-blue-400">Next up:</span>{' '}
-                        <span className="group-hover:underline">{upcoming[0].event_name}</span>{' '}
-                        <span className="text-muted-foreground">• {formatEventDate(upcoming[0].date)}</span>
+                        <span className="group-hover:underline">{upcomingList.events[0].event_name}</span>{' '}
+                        <span className="text-muted-foreground">• {formatEventDate(upcomingList.events[0].date)}</span>
                       </span>
                     </button>
                   ) : (
@@ -321,7 +352,7 @@ export default function DashboardPage() {
                 </div>
                 {filteredOngoing.length > 0 && (
                   <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
-                    {filteredOngoing.length}
+                    {selectedDate ? filteredOngoing.length : `${filteredOngoing.length}${ongoingList.hasMore ? '+' : ''}`}
                   </span>
                 )}
               </div>
@@ -362,6 +393,17 @@ export default function DashboardPage() {
                       />
                     </div>
                   ))}
+                  {/* Load more sentinel */}
+                  {!selectedDate && (
+                    <>
+                      <div ref={ongoingList.loadMoreRef} />
+                      {ongoingList.isLoadingMore && (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </section>
@@ -377,7 +419,7 @@ export default function DashboardPage() {
                 </div>
                 {filteredUpcoming.length > 0 && (
                   <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
-                    {filteredUpcoming.length}
+                    {selectedDate ? filteredUpcoming.length : `${filteredUpcoming.length}${upcomingList.hasMore ? '+' : ''}`}
                   </span>
                 )}
               </div>
@@ -414,6 +456,17 @@ export default function DashboardPage() {
                       />
                     </div>
                   ))}
+                  {/* Load more sentinel */}
+                  {!selectedDate && (
+                    <>
+                      <div ref={upcomingList.loadMoreRef} />
+                      {upcomingList.isLoadingMore && (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </section>
@@ -429,7 +482,7 @@ export default function DashboardPage() {
                 </div>
                 {filteredPast.length > 0 && (
                   <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
-                    {filteredPast.length}
+                    {selectedDate ? filteredPast.length : `${filteredPast.length}${pastList.hasMore ? '+' : ''}`}
                   </span>
                 )}
               </div>
@@ -466,6 +519,17 @@ export default function DashboardPage() {
                       />
                     </div>
                   ))}
+                  {/* Load more sentinel */}
+                  {!selectedDate && (
+                    <>
+                      <div ref={pastList.loadMoreRef} />
+                      {pastList.isLoadingMore && (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </section>
