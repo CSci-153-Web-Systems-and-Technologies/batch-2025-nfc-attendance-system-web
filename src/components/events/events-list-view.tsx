@@ -111,53 +111,49 @@ export function EventsListView({
         )}
       </div>
 
-      {/* Filters */}
-      <Card className="bg-card shadow-md">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'all'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-accent'
-              }`}
-            >
-              All Events
-            </button>
-            <button
-              onClick={() => setFilter('ongoing')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'ongoing'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-accent'
-              }`}
-            >
-              Currently Happening
-            </button>
-            <button
-              onClick={() => setFilter('upcoming')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'upcoming'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-accent'
-              }`}
-            >
-              Upcoming
-            </button>
-            <button
-              onClick={() => setFilter('past')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'past'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-accent'
-              }`}
-            >
-              Past
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters - Inline tab style */}
+      <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+            filter === 'all'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setFilter('ongoing')}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+            filter === 'ongoing'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Ongoing
+        </button>
+        <button
+          onClick={() => setFilter('upcoming')}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+            filter === 'upcoming'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Upcoming
+        </button>
+        <button
+          onClick={() => setFilter('past')}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+            filter === 'past'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Past
+        </button>
+      </div>
 
       {/* Events List */}
       {filteredEvents.length === 0 ? (

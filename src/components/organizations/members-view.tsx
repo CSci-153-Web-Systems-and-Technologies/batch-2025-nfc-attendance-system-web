@@ -19,7 +19,8 @@ import {
   MoreVertical,
   Trash2,
   UserCog,
-  ArrowLeft
+  ArrowLeft,
+  ClipboardCheck
 } from 'lucide-react'
 
 interface MembersViewProps {
@@ -56,6 +57,7 @@ export function MembersView({
     All: initialTotal,
     Owner: initialMembers.filter(m => m.role === 'Owner').length,
     Admin: initialMembers.filter(m => m.role === 'Admin').length,
+    'Attendance Taker': initialMembers.filter(m => m.role === 'Attendance Taker').length,
     Member: initialMembers.filter(m => m.role === 'Member').length,
   }))
 
@@ -84,6 +86,8 @@ export function MembersView({
         return <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       case 'Admin':
         return <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+      case 'Attendance Taker':
+        return <ClipboardCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
       case 'Member':
         return <User className="w-4 h-4 text-muted-foreground" />
     }
@@ -96,6 +100,8 @@ export function MembersView({
         return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
       case 'Admin':
         return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      case 'Attendance Taker':
+        return 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 border-teal-200 dark:border-teal-800'
       case 'Member':
         return 'bg-muted text-foreground border-border'
     }
@@ -139,6 +145,7 @@ export function MembersView({
           All: newTotal,
           Owner: newMembers.filter(m => m.role === 'Owner').length,
           Admin: newMembers.filter(m => m.role === 'Admin').length,
+          'Attendance Taker': newMembers.filter(m => m.role === 'Attendance Taker').length,
           Member: newMembers.filter(m => m.role === 'Member').length,
         })
       }
@@ -265,50 +272,53 @@ export function MembersView({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('All')}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+        <Card className="p-3 md:p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">All Members</p>
-              <p className="text-2xl font-bold text-foreground">{roleCount.All}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Total</p>
+              <p className="text-xl md:text-2xl font-bold text-foreground">{roleCount.All}</p>
             </div>
-            <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <Users className="w-6 h-6 md:w-8 md:h-8 text-purple-600 dark:text-purple-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-amber-200 dark:hover:border-amber-800" onClick={() => setSelectedRole('Owner')}>
+        <Card className="p-3 md:p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-amber-200 dark:hover:border-amber-800" onClick={() => setSelectedRole('All')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Owners</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{roleCount.Owner}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Managers</p>
+              <p className="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">{roleCount.Owner + roleCount.Admin}</p>
             </div>
-            <Crown className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <div className="flex -space-x-1">
+              <Crown className="w-5 h-5 md:w-6 md:h-6 text-amber-600 dark:text-amber-400" />
+              <Shield className="w-5 h-5 md:w-6 md:h-6 text-purple-600 dark:text-purple-400" />
+            </div>
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800" onClick={() => setSelectedRole('Admin')}>
+        <Card className="p-3 md:p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-teal-200 dark:hover:border-teal-800" onClick={() => setSelectedRole('Attendance Taker')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Admins</p>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{roleCount.Admin}</p>
+              <p className="text-xs md:text-sm text-muted-foreground"><span className="hidden sm:inline">Attendance </span>Takers</p>
+              <p className="text-xl md:text-2xl font-bold text-teal-600 dark:text-teal-400">{roleCount['Attendance Taker']}</p>
             </div>
-            <Shield className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <ClipboardCheck className="w-6 h-6 md:w-8 md:h-8 text-teal-600 dark:text-teal-400" />
           </div>
         </Card>
 
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-border" onClick={() => setSelectedRole('Member')}>
+        <Card className="p-3 md:p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-border" onClick={() => setSelectedRole('Member')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Members</p>
-              <p className="text-2xl font-bold text-muted-foreground">{roleCount.Member}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Members</p>
+              <p className="text-xl md:text-2xl font-bold text-muted-foreground">{roleCount.Member}</p>
             </div>
-            <User className="w-8 h-8 text-muted-foreground" />
+            <User className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
           </div>
         </Card>
       </div>
 
       {/* Search and Filter */}
-      <Card className="p-6 mb-6">
+      <Card className="p-4 md:p-6 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -320,15 +330,16 @@ export function MembersView({
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {(['All', 'Owner', 'Admin', 'Member'] as const).map((role) => (
+          <div className="flex gap-1.5 md:gap-2 flex-wrap">
+            {(['All', 'Owner', 'Admin', 'Attendance Taker', 'Member'] as const).map((role) => (
               <Button
                 key={role}
                 variant={selectedRole === role ? 'default' : 'outline'}
                 onClick={() => setSelectedRole(role)}
                 size="sm"
+                className="text-xs md:text-sm px-2 md:px-3"
               >
-                {role}
+                {role === 'Attendance Taker' ? <><span className="sm:hidden">Taker</span><span className="hidden sm:inline">Att. Taker</span></> : role}
               </Button>
             ))}
           </div>
@@ -357,89 +368,113 @@ export function MembersView({
       ) : (
         <div className="space-y-3">
           {filteredMembers.map((member) => (
-            <Card key={member.id} className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
+            <Card key={member.id} className="p-4 md:p-6 hover:shadow-md transition-shadow">
+              {/* Mobile Layout: Stacked */}
+              <div className="flex flex-col gap-3">
+                {/* Header: Avatar + Name + Role Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-base md:text-lg shrink-0">
                     {member.user.name.charAt(0).toUpperCase()}
                   </div>
-
-                  {/* Member Info */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-foreground">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base md:text-lg font-semibold text-foreground truncate">
                         {member.user.name}
                       </h3>
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getRoleColor(member.role)}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${getRoleColor(member.role)}`}>
                         {getRoleIcon(member.role)}
-                        {member.role}
+                        <span className="hidden xs:inline">{member.role === 'Attendance Taker' ? 'Taker' : member.role}</span>
                       </span>
                     </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="w-4 h-4" />
-                        <span>{member.user.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          Joined {new Date(member.joined_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                      {member.user.nfc_tag_id && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <UserCheck className="w-4 h-4" />
-                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                            NFC: {member.user.nfc_tag_id}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-sm text-muted-foreground truncate">{member.user.email}</p>
                   </div>
                 </div>
 
-                {/* Actions */}
+                {/* Details: Joined date + NFC (collapsible on mobile) */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground pl-0 md:pl-14">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>
+                      Joined {new Date(member.joined_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  {member.user.nfc_tag_id && (
+                    <div className="flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {member.user.nfc_tag_id}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions: Full width row on mobile */}
                 {canManageTarget(member) && (
-                  <div className="flex items-center gap-2">
-                    {member.role !== 'Admin' && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                    {/* Member can be promoted to Attendance Taker */}
+                    {member.role === 'Member' && (
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="gap-2"
+                        className="flex-1 gap-1.5 text-xs h-8"
                         disabled={actionLoadingId === member.id}
-                        onClick={() => updateRole(member.id, 'Admin')}
+                        onClick={() => updateRole(member.id, 'Attendance Taker')}
                       >
-                        <UserCog className="w-4 h-4" />
-                        Promote to Admin
+                        <ClipboardCheck className="w-3.5 h-3.5" />
+                        <span>Make Taker</span>
                       </Button>
                     )}
+                    {/* Attendance Taker can be promoted to Admin or demoted to Member */}
+                    {member.role === 'Attendance Taker' && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 gap-1.5 text-xs h-8"
+                          disabled={actionLoadingId === member.id}
+                          onClick={() => updateRole(member.id, 'Admin')}
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                          <span>To Admin</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 gap-1.5 text-xs h-8"
+                          disabled={actionLoadingId === member.id}
+                          onClick={() => updateRole(member.id, 'Member')}
+                        >
+                          <User className="w-3.5 h-3.5" />
+                          <span>To Member</span>
+                        </Button>
+                      </>
+                    )}
+                    {/* Admin can be demoted to Attendance Taker */}
                     {member.role === 'Admin' && (
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="gap-2"
+                        className="flex-1 gap-1.5 text-xs h-8"
                         disabled={actionLoadingId === member.id}
-                        onClick={() => updateRole(member.id, 'Member')}
+                        onClick={() => updateRole(member.id, 'Attendance Taker')}
                       >
-                        <UserCog className="w-4 h-4" />
-                        Demote to Member
+                        <ClipboardCheck className="w-3.5 h-3.5" />
+                        <span>To Taker</span>
                       </Button>
                     )}
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 h-8 w-8 p-0 shrink-0"
                       disabled={actionLoadingId === member.id}
                       onClick={() => removeMember(member.id)}
+                      title="Remove member"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Remove
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 )}
