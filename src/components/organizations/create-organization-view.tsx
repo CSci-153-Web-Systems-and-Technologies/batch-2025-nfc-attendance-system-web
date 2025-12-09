@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Building2, ArrowLeft, AlertCircle, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,8 +19,39 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
     description: '',
     tag: '',
   })
+  const [logo, setLogo] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Logo must be JPEG or PNG format')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(`Logo size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds 5MB limit`)
+      return
+    }
+
+    setLogo(file)
+    setError('')
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = () => {
+    setLogo(null)
+    setLogoPreview(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,17 +70,36 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/organization', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      let response
+
+      if (logo) {
+        // Use FormData for file upload
+        const formDataPayload = new FormData()
+        formDataPayload.append('data', JSON.stringify({
           name: formData.name,
           description: formData.description || null,
           tag: formData.tag.trim() || null,
-        }),
-      })
+        }))
+        formDataPayload.append('logo', logo)
+
+        response = await fetch('/api/organization', {
+          method: 'POST',
+          body: formDataPayload,
+        })
+      } else {
+        // Regular JSON request
+        response = await fetch('/api/organization', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            description: formData.description || null,
+            tag: formData.tag.trim() || null,
+          }),
+        })
+      }
 
       if (!response.ok) {
         const data = await response.json()
@@ -108,6 +158,47 @@ export function CreateOrganizationView({ userId }: CreateOrganizationViewProps) 
                 </div>
               </div>
             )}
+
+            {/* Organization Logo */}
+            <div className="space-y-2">
+              <Label>Organization Logo (Optional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Recommended: Square image (1:1 ratio) • Max 5MB • JPG or PNG
+              </p>
+              {logoPreview ? (
+                <div className="relative w-32 h-32">
+                  <img
+                    src={logoPreview}
+                    alt="Logo preview"
+                    className="w-32 h-32 object-cover rounded-xl border border-input"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6"
+                    onClick={removeLogo}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="w-32 h-32 border-2 border-dashed border-input rounded-xl flex flex-col items-center justify-center hover:border-primary/50 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    id="logo"
+                    accept="image/jpeg,image/png"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
+                  <label htmlFor="logo" className="cursor-pointer text-center p-2">
+                    <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                    <p className="text-xs text-muted-foreground">Upload logo</p>
+                  </label>
+                </div>
+              )}
+            </div>
 
             {/* Organization Name */}
             <div className="space-y-2">

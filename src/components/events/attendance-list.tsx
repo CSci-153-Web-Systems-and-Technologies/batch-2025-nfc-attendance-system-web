@@ -3,19 +3,25 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/client'
 import type { AttendanceWithUser } from '@/types/attendance'
-import { User, Users, Smartphone, QrCode, UserPlus } from 'lucide-react'
+import { User, Users, Smartphone, QrCode, UserPlus, Download } from 'lucide-react'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { Button } from '@/components/ui/button'
 
 interface AttendanceListProps {
   eventId: string
   organizationId: string
+  userRole?: string
 }
 
-export function AttendanceList({ eventId, organizationId }: AttendanceListProps) {
+export function AttendanceList({ eventId, organizationId, userRole }: AttendanceListProps) {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const supabase = createClient()
+
+  // Check if user can export (Admin or Owner only)
+  const canExport = userRole && ['Admin', 'Owner'].includes(userRole)
 
   // Fetch initial attendance records
   useEffect(() => {
@@ -68,6 +74,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
               .from('event_attendance')
               .select(`
                 *,
+                is_member,
                 user:users!event_attendance_user_id_fkey(
                   id,
                   name,
@@ -122,6 +129,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
               .from('event_attendance')
               .select(`
                 *,
+                is_member,
                 user:users!event_attendance_user_id_fkey(
                   id,
                   name,
@@ -200,6 +208,40 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
     })
   }
 
+  // Handle Excel export
+  const handleExport = async () => {
+    try {
+      setExporting(true)
+      const response = await fetch(`/api/attendance/event/${eventId}/export`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to export attendance')
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      link.download = filenameMatch ? filenameMatch[1] : `Attendance_${eventId}.xlsx`
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error exporting attendance:', err)
+      alert(err instanceof Error ? err.message : 'Failed to export attendance')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -233,6 +275,21 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
 
   return (
     <div className="space-y-3">
+      {/* Export Button - Only for Admin/Owner */}
+      {canExport && (
+        <div className="flex justify-end mb-4">
+          <Button
+            onClick={handleExport}
+            disabled={exporting}
+            variant="outline"
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting...' : 'Export to Excel'}
+          </Button>
+        </div>
+      )}
+
       {attendanceRecords.map((record) => (
         <div
           key={record.id}
@@ -240,7 +297,7 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
         >
           <div className="flex items-center gap-4 flex-1">
             {/* User Avatar */}
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
               <User className="h-5 w-5 text-white" />
             </div>
 
@@ -255,10 +312,15 @@ export function AttendanceList({ eventId, organizationId }: AttendanceListProps)
             </div>
 
             {/* User Type Badge */}
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex sm:items-center sm:gap-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
                 {record.user.user_type}
               </span>
+              {record.is_member === false && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                  Guest
+                </span>
+              )}
             </div>
 
             {/* Scan Method Badge */}

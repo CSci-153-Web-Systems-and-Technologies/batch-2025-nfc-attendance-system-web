@@ -38,24 +38,24 @@ export function EventCard({ event, status, onClick, showOrganization = false, sh
   const statusConfig = {
     ongoing: {
       label: 'Currently Happening',
-      badgeClass: 'bg-green-100 text-green-700',
+      badgeClass: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
       borderClass: 'border-l-4 border-l-green-500',
-      dateBoxClass: 'bg-violet-50',
-      dateTextClass: 'text-violet-600',
+      dateBoxClass: 'bg-primary/10',
+      dateTextClass: 'text-primary',
     },
     upcoming: {
       label: 'Upcoming',
-      badgeClass: 'bg-green-100 text-green-700',
-      borderClass: 'border-l-4 border-l-violet-500',
-      dateBoxClass: 'bg-violet-50',
-      dateTextClass: 'text-violet-600',
+      badgeClass: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+      borderClass: 'border-l-4 border-l-primary',
+      dateBoxClass: 'bg-primary/10',
+      dateTextClass: 'text-primary',
     },
     past: {
       label: 'Past',
-      badgeClass: 'bg-gray-100 text-gray-600',
+      badgeClass: 'bg-muted text-muted-foreground',
       borderClass: '',
-      dateBoxClass: 'bg-violet-50',
-      dateTextClass: 'text-violet-600',
+      dateBoxClass: 'bg-primary/10',
+      dateTextClass: 'text-primary',
     },
   }
 
@@ -69,7 +69,7 @@ export function EventCard({ event, status, onClick, showOrganization = false, sh
   
   return (
     <Card
-      className={`bg-white shadow-md hover:shadow-lg transition-shadow cursor-pointer ${config.borderClass}`}
+      className={`bg-card shadow-md hover:shadow-lg transition-shadow cursor-pointer ${config.borderClass}`}
       onClick={onClick}
     >
       <CardContent className="p-6">
@@ -78,7 +78,7 @@ export function EventCard({ event, status, onClick, showOrganization = false, sh
           <div className="flex-1 space-y-3">
             {/* Event Name & Status Badge */}
             <div className="flex items-center gap-3 flex-wrap">
-              <h3 className="text-lg font-semibold text-gray-800">
+              <h3 className="text-lg font-semibold text-foreground">
                 {event.event_name}
               </h3>
               <span className={`px-2 py-1 text-xs font-semibold rounded-full ${config.badgeClass}`}>
@@ -88,23 +88,23 @@ export function EventCard({ event, status, onClick, showOrganization = false, sh
 
             {/* Organization */}
             {showOrganization && event.organization && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Building2 className="h-4 w-4 text-violet-600" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Building2 className="h-4 w-4 text-primary" />
                 <span>{event.organization.name}</span>
               </div>
             )}
 
             {/* Date and Time */}
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Calendar className="h-4 w-4 text-violet-600" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 text-primary" />
               <span>{formatEventDate(event.date)}</span>
-              <Clock className="h-4 w-4 text-violet-600 ml-2" />
+              <Clock className="h-4 w-4 text-primary ml-2" />
               <span>{formatEventTime(event.date)}</span>
             </div>
 
             {/* Attendance Window */}
             {hasAttendanceWindow && (
-              <div className="flex items-center gap-2 text-sm text-violet-600 bg-violet-50 px-3 py-2 rounded-md w-fit">
+              <div className="flex items-center gap-2 text-sm text-primary bg-primary/10 px-3 py-2 rounded-md w-fit">
                 <Timer className="h-4 w-4" />
                 <span>
                   Attendance: {formatEventTime(event.event_start!)} - {formatEventTime(event.event_end!)}
@@ -114,23 +114,23 @@ export function EventCard({ event, status, onClick, showOrganization = false, sh
 
             {/* Location */}
             {event.location && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <MapPin className="h-4 w-4 text-violet-600" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 text-primary" />
                 <span>{event.location}</span>
               </div>
             )}
 
             {/* Description Preview */}
             {event.description && (
-              <div className="flex items-start gap-2 text-sm text-gray-600">
-                <FileText className="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <FileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <p className="line-clamp-2">{event.description}</p>
               </div>
             )}
             
             {/* Creator */}
             {showCreator && creator && (
-              <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                 <User className="h-3 w-3" />
                 <span>Created by {creator.name}</span>
               </div>

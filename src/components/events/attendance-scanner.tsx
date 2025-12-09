@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   Loader2,
   User,
+  Search,
+  UserCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -24,6 +26,9 @@ interface AttendanceScannerProps {
   organizationId: string
   eventName: string
   organizationName: string
+  eventLatitude?: number | null
+  eventLongitude?: number | null
+  attendanceRadiusMeters?: number | null
 }
 
 interface ScannedUser {
@@ -36,15 +41,29 @@ interface ScannedUser {
   scan_method: ScanMethod
   status: 'success' | 'error' | 'duplicate'
   message?: string
+  is_member?: boolean
+}
+
+interface SearchedUser {
+  id: string
+  name: string
+  email: string
+  user_type: string
+  tag_id: string | null
+  is_member: boolean
 }
 
 type ScanMode = 'NFC' | 'QR' | 'Manual'
+type ManualEntryMode = 'tag' | 'search'
 
 export function AttendanceScanner({
   eventId,
   organizationId,
   eventName,
   organizationName,
+  eventLatitude,
+  eventLongitude,
+  attendanceRadiusMeters,
 }: AttendanceScannerProps) {
   const [scanMode, setScanMode] = useState<ScanMode>('QR')
   const [isScanning, setIsScanning] = useState(false)
@@ -52,13 +71,91 @@ export function AttendanceScanner({
   const [manualTagId, setManualTagId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [nfcSupported, setNfcSupported] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const [currentLat, setCurrentLat] = useState<number | null>(null)
+  const [currentLng, setCurrentLng] = useState<number | null>(null)
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false)
+  const [checkingLocation, setCheckingLocation] = useState(false)
+  const [distanceFromEvent, setDistanceFromEvent] = useState<number | null>(null)
+  // Manual entry mode state
+  const [manualEntryMode, setManualEntryMode] = useState<ManualEntryMode>('search')
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchedUser[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<SearchedUser | null>(null)
   const qrReaderRef = useRef<Html5Qrcode | null>(null)
   const qrScannerRef = useRef<HTMLDivElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check NFC support on mount
   useEffect(() => {
     setNfcSupported('NDEFReader' in window)
   }, [])
+
+  // Check and request location permission if radius restriction is active
+  useEffect(() => {
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      checkLocationPermission()
+    } else {
+      // No restriction, grant access
+      setLocationPermissionGranted(true)
+    }
+  }, [attendanceRadiusMeters, eventLatitude, eventLongitude])
+
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180
+    const R = 6371000 // Earth radius in meters
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const checkLocationPermission = async () => {
+    setCheckingLocation(true)
+    try {
+      const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        })
+      })
+      setCurrentLat(coords.coords.latitude)
+      setCurrentLng(coords.coords.longitude)
+      setLocationPermissionGranted(true)
+      setGeoError(null)
+      
+      // Calculate distance from event location
+      if (eventLatitude != null && eventLongitude != null) {
+        const distance = calculateDistance(
+          coords.coords.latitude,
+          coords.coords.longitude,
+          eventLatitude,
+          eventLongitude
+        )
+        setDistanceFromEvent(distance)
+      }
+    } catch (err: any) {
+      setLocationPermissionGranted(false)
+      if (err.code === 1) {
+        setGeoError('Location permission denied. Please enable location access to mark attendance for this event.')
+      } else if (err.code === 2) {
+        setGeoError('Location unavailable. Please check your device settings.')
+      } else if (err.code === 3) {
+        setGeoError('Location request timed out. Please try again.')
+      } else {
+        setGeoError('Cannot access location. Please enable location services.')
+      }
+    } finally {
+      setCheckingLocation(false)
+    }
+  }
 
   // Cleanup QR scanner on unmount or mode change
   useEffect(() => {
@@ -169,6 +266,56 @@ export function AttendanceScanner({
     if (isProcessing) return // Prevent duplicate processing
 
     setIsProcessing(true)
+
+    // If event has radius restriction, verify location permission is granted
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      if (!locationPermissionGranted || currentLat == null || currentLng == null) {
+        setGeoError('Location access required. Please enable location to mark attendance.')
+        addScannedUser({
+          id: '',
+          name: 'Error',
+          email: '',
+          user_type: '',
+          tag_id: tagId,
+          marked_at: new Date().toISOString(),
+          scan_method: method,
+          status: 'error',
+          message: 'Cannot mark attendance without location (restricted event).'
+        })
+        setIsProcessing(false)
+        return
+      }
+      // Refresh location to get most current position
+      try {
+        const coords = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 30000, // Use cached if less than 30 seconds old
+          })
+        })
+        setCurrentLat(coords.coords.latitude)
+        setCurrentLng(coords.coords.longitude)
+      } catch (err: any) {
+        // If refresh fails but we had previous coords, use those
+        if (currentLat == null || currentLng == null) {
+          setGeoError('Cannot get current location.')
+          addScannedUser({
+            id: '',
+            name: 'Error',
+            email: '',
+            user_type: '',
+            tag_id: tagId,
+            marked_at: new Date().toISOString(),
+            scan_method: method,
+            status: 'error',
+            message: 'Location unavailable. Please try again.'
+          })
+          setIsProcessing(false)
+          return
+        }
+      }
+    }
 
     // Basic tag format validation (UUID pattern)
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -349,8 +496,8 @@ export function AttendanceScanner({
             event_id: eventId,
             user_id: user.id,
             scan_method: method,
-            location_lat: null,
-            location_lng: null,
+            location_lat: attendanceRadiusMeters ? currentLat : null,
+            location_lng: attendanceRadiusMeters ? currentLng : null,
           }),
         })
       } catch (networkError: any) {
@@ -473,6 +620,139 @@ export function AttendanceScanner({
     setManualTagId('')
   }
 
+  // Search for users by name or email
+  const searchUsers = async (query: string) => {
+    if (query.trim().length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(
+        `/api/user/search?q=${encodeURIComponent(query)}&limit=10&exclude_org_members=${organizationId}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.users || [])
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error('Error searching users:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Debounced search handler
+  const handleSearchChange = (value: string) => {
+    setUserSearchQuery(value)
+    setSelectedUser(null)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      searchUsers(value)
+    }, 300)
+  }
+
+  // Mark attendance for selected user (from search)
+  const handleMarkSelectedUser = async () => {
+    if (!selectedUser || isProcessing) return
+
+    setIsProcessing(true)
+
+    // If event has radius restriction, verify location
+    if (attendanceRadiusMeters && eventLatitude != null && eventLongitude != null) {
+      if (!locationPermissionGranted || currentLat == null || currentLng == null) {
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: new Date().toISOString(),
+          scan_method: 'Manual',
+          status: 'error',
+          message: 'Cannot mark attendance without location (restricted event).',
+          is_member: selectedUser.is_member
+        })
+        setIsProcessing(false)
+        return
+      }
+    }
+
+    try {
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          user_id: selectedUser.id,
+          scan_method: 'Manual',
+          location_lat: attendanceRadiusMeters ? currentLat : null,
+          location_lng: attendanceRadiusMeters ? currentLng : null,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        let status: 'error' | 'duplicate' = 'error'
+        if (response.status === 409) {
+          status = 'duplicate'
+        }
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: new Date().toISOString(),
+          scan_method: 'Manual',
+          status: status,
+          message: data.error || 'Failed to mark attendance',
+          is_member: selectedUser.is_member
+        })
+      } else {
+        addScannedUser({
+          id: selectedUser.id,
+          name: selectedUser.name,
+          email: selectedUser.email,
+          user_type: selectedUser.user_type,
+          tag_id: selectedUser.tag_id || '',
+          marked_at: data.attendance?.marked_at || new Date().toISOString(),
+          scan_method: 'Manual',
+          status: 'success',
+          message: selectedUser.is_member ? 'Attendance marked successfully' : 'Guest attendance marked',
+          is_member: selectedUser.is_member
+        })
+      }
+    } catch (error: any) {
+      addScannedUser({
+        id: selectedUser.id,
+        name: selectedUser.name,
+        email: selectedUser.email,
+        user_type: selectedUser.user_type,
+        tag_id: selectedUser.tag_id || '',
+        marked_at: new Date().toISOString(),
+        scan_method: 'Manual',
+        status: 'error',
+        message: error.message || 'Network error',
+        is_member: selectedUser.is_member
+      })
+    } finally {
+      setIsProcessing(false)
+      setSelectedUser(null)
+      setUserSearchQuery('')
+      setSearchResults([])
+    }
+  }
+
   // Add scanned user to the list
   const addScannedUser = (user: ScannedUser) => {
     setScannedUsers((prev) => [user, ...prev])
@@ -542,10 +822,10 @@ export function AttendanceScanner({
             <ArrowLeft className="h-4 w-4" />
             Back to Event
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Take Attendance
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             {eventName} • {organizationName}
           </p>
         </div>
@@ -613,6 +893,64 @@ export function AttendanceScanner({
         </CardContent>
       </Card>
 
+      {/* Location Permission Banner */}
+      {attendanceRadiusMeters && eventLatitude != null && eventLongitude != null && (
+        <Card className={locationPermissionGranted ? 'border-green-200 bg-green-50/50' : 'border-amber-500 bg-amber-50'}>
+          <CardContent className="pt-6">
+            {checkingLocation ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <p className="text-sm font-medium">Checking location access...</p>
+              </div>
+            ) : locationPermissionGranted ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Location Access Granted</p>
+                    {distanceFromEvent != null && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Distance from event: <span className="font-semibold">{Math.round(distanceFromEvent)}m</span>
+                        {distanceFromEvent <= attendanceRadiusMeters! ? (
+                          <span className="text-green-600 ml-2">✓ Within range</span>
+                        ) : (
+                          <span className="text-red-600 ml-2">✗ Too far ({attendanceRadiusMeters}m required)</span>
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-green-700 mt-1">
+                      Required: Within {attendanceRadiusMeters}m of event location
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900">Location Access Required</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      This event restricts attendance to users within {attendanceRadiusMeters}m of the event location.
+                      You must enable location access to mark attendance.
+                    </p>
+                    {geoError && <p className="text-xs text-red-600 mt-2">{geoError}</p>}
+                  </div>
+                </div>
+                <Button
+                  onClick={checkLocationPermission}
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-amber-600 text-amber-900 hover:bg-amber-100"
+                >
+                  Enable Location Access
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Scanner Interface */}
       <Card>
         <CardHeader>
@@ -623,6 +961,14 @@ export function AttendanceScanner({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {!locationPermissionGranted && attendanceRadiusMeters && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm font-medium text-amber-900">⚠️ Scanner Disabled</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Please enable location access above to use the attendance scanner.
+              </p>
+            </div>
+          )}
           {/* NFC Mode */}
           {scanMode === 'NFC' && (
             <div className="space-y-4">
@@ -632,6 +978,7 @@ export function AttendanceScanner({
                     onClick={startNFCScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <Smartphone className="h-5 w-5" />
                     Start NFC Scan
@@ -677,6 +1024,7 @@ export function AttendanceScanner({
                     onClick={startQRScan}
                     size="lg"
                     className="gap-2"
+                    disabled={attendanceRadiusMeters != null && !locationPermissionGranted}
                   >
                     <QrCode className="h-5 w-5" />
                     Start QR Scan
@@ -706,37 +1054,188 @@ export function AttendanceScanner({
 
           {/* Manual Mode */}
           {scanMode === 'Manual' && (
-            <form onSubmit={handleManualEntry} className="space-y-4">
-              <div>
-                <Label htmlFor="tag-id">Tag ID</Label>
-                <Input
-                  id="tag-id"
-                  type="text"
-                  placeholder="Enter or paste tag ID"
-                  value={manualTagId}
-                  onChange={(e) => setManualTagId(e.target.value)}
-                  disabled={isProcessing}
-                  className="mt-2"
-                />
+            <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  type="button"
+                  variant={manualEntryMode === 'search' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setManualEntryMode('search')}
+                  className="flex-1 gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Search User
+                </Button>
+                <Button
+                  type="button"
+                  variant={manualEntryMode === 'tag' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setManualEntryMode('tag')}
+                  className="flex-1 gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Enter Tag ID
+                </Button>
               </div>
-              <Button
-                type="submit"
-                disabled={!manualTagId.trim() || isProcessing}
-                className="w-full gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-5 w-5" />
-                    Mark Attendance
-                  </>
-                )}
-              </Button>
-            </form>
+
+              {/* User Search Mode */}
+              {manualEntryMode === 'search' && (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="user-search">Search by Name or Email</Label>
+                    <div className="relative mt-2">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="user-search"
+                        type="text"
+                        placeholder="Type at least 2 characters..."
+                        value={userSearchQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        disabled={isProcessing}
+                        className="pl-10"
+                      />
+                    </div>
+                    {isSearching && (
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 && !selectedUser && (
+                    <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => setSelectedUser(user)}
+                          className="w-full p-3 text-left hover:bg-muted/50 transition-colors flex items-center gap-3"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
+                            <User className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">{user.name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                              {user.user_type}
+                            </span>
+                            {!user.is_member && (
+                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                                Guest
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Selected User Confirmation */}
+                  {selectedUser && (
+                    <div className="border-2 border-primary rounded-lg p-4 bg-primary/5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-avatar flex items-center justify-center flex-shrink-0">
+                          <UserCheck className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground">{selectedUser.name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                          <div className="flex gap-2 mt-1">
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                              {selectedUser.user_type}
+                            </span>
+                            {!selectedUser.is_member && (
+                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                                Guest (Non-member)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedUser(null)
+                            setUserSearchQuery('')
+                          }}
+                          disabled={isProcessing}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleMarkSelectedUser}
+                          disabled={isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
+                          className="flex-1 gap-2"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Marking...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              Mark Attendance
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {userSearchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No users found matching "{userSearchQuery}"
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Tag ID Entry Mode */}
+              {manualEntryMode === 'tag' && (
+                <form onSubmit={handleManualEntry} className="space-y-4">
+                  <div>
+                    <Label htmlFor="tag-id">Tag ID</Label>
+                    <Input
+                      id="tag-id"
+                      type="text"
+                      placeholder="Enter or paste tag ID"
+                      value={manualTagId}
+                      onChange={(e) => setManualTagId(e.target.value)}
+                      disabled={isProcessing}
+                      className="mt-2"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={!manualTagId.trim() || isProcessing || (attendanceRadiusMeters != null && !locationPermissionGranted)}
+                    className="w-full gap-2"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-5 w-5" />
+                        Mark Attendance
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -771,9 +1270,16 @@ export function AttendanceScanner({
                     <div className="flex items-center gap-3 flex-1">
                       {getStatusIcon(user.status)}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {user.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground truncate">
+                            {user.name}
+                          </p>
+                          {user.is_member === false && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                              Guest
+                            </span>
+                          )}
+                        </div>
                         {user.email && (
                           <p className="text-sm text-muted-foreground truncate">
                             {user.email}

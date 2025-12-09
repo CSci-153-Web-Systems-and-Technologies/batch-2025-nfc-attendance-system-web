@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/server';
+import { haversineDistanceMeters } from '@/lib/utils';
 import type {
   Attendance,
   AttendanceWithUser,
@@ -25,7 +26,7 @@ export class AttendanceService {
     // First, fetch the event to check attendance window
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('event_start, event_end, event_name')
+      .select('event_start, event_end, event_name, latitude, longitude, attendance_radius_meters')
       .eq('id', input.event_id)
       .single();
 
@@ -35,6 +36,23 @@ export class AttendanceService {
     }
 
     // Check if attendance is within the allowed time window
+        // Geolocation restriction: if event has attendance_radius_meters set
+        if (event.attendance_radius_meters && event.latitude && event.longitude) {
+          // Require client provided coordinates
+          if (input.location_lat == null || input.location_lng == null) {
+            throw new Error('Location required: enable device location to mark attendance for this event');
+          }
+          // Compute distance (meters)
+          const distanceMeters = haversineDistanceMeters(
+            event.latitude,
+            event.longitude,
+            input.location_lat,
+            input.location_lng
+          );
+          if (distanceMeters > event.attendance_radius_meters) {
+            throw new Error(`You are outside the allowed attendance radius (${event.attendance_radius_meters}m). Distance: ${Math.round(distanceMeters)}m`);
+          }
+        }
     if (event.event_start && event.event_end) {
       const now = new Date();
       const startTime = new Date(event.event_start);
@@ -90,9 +108,6 @@ export class AttendanceService {
       if (error.message.includes('already marked')) {
         throw new Error('Attendance already marked for this user at this event');
       }
-      if (error.message.includes('not a member')) {
-        throw new Error('User is not a member of the organization');
-      }
       if (error.message.includes('does not have permission')) {
         throw new Error('You do not have permission to take attendance for this event');
       }
@@ -139,6 +154,7 @@ export class AttendanceService {
       location_lat: record.location_lat,
       location_lng: record.location_lng,
       notes: record.notes,
+      is_member: record.is_member ?? true, // Default to true for existing records
       created_at: record.created_at,
       updated_at: record.updated_at,
       user: {

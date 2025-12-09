@@ -101,6 +101,9 @@ export class EventService {
         organization_id: input.organization_id,
         description: input.description || null,
         location: input.location || null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        attendance_radius_meters: input.attendance_radius_meters ?? null,
         event_start: input.event_start || null,
         event_end: input.event_end || null,
         created_by: userId,
@@ -383,6 +386,10 @@ export class EventService {
     if (input.description !== undefined)
       updateData.description = input.description
     if (input.location !== undefined) updateData.location = input.location
+    if (input.latitude !== undefined) updateData.latitude = input.latitude
+    if (input.longitude !== undefined) updateData.longitude = input.longitude
+    if (input.attendance_radius_meters !== undefined)
+      updateData.attendance_radius_meters = input.attendance_radius_meters
     if (input.event_start !== undefined) updateData.event_start = input.event_start
     if (input.event_end !== undefined) updateData.event_end = input.event_end
 
@@ -439,39 +446,65 @@ export class EventService {
   /**
    * Get upcoming events for a user (events in the future)
    * Uses upcoming_events view for optimized query
+   * @param organizationId - Optional: filter to a specific organization
+   * @param offset - Optional: offset for pagination
    */
   static async getUpcomingEvents(
     userId: string,
-    limit: number = 10
-  ): Promise<EventWithOrganization[]> {
+    limit: number = 10,
+    organizationId?: string,
+    offset: number = 0
+  ): Promise<{ events: EventWithOrganization[]; total: number }> {
     const supabase = await createClient()
 
-    // First get user's organizations
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', userId)
+    let organizationIds: string[]
 
-    if (!memberships || memberships.length === 0) {
-      return []
+    if (organizationId) {
+      // Verify user is a member of this organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (!membership) {
+        return { events: [], total: 0 }
+      }
+      organizationIds = [organizationId]
+    } else {
+      // Get all user's organizations
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+
+      if (!memberships || memberships.length === 0) {
+        return { events: [], total: 0 }
+      }
+      organizationIds = memberships.map((m) => m.organization_id)
     }
 
-    const organizationIds = memberships.map((m) => m.organization_id)
+    // Get total count
+    const { count } = await supabase
+      .from('upcoming_events')
+      .select('*', { count: 'exact', head: true })
+      .in('organization_id', organizationIds)
 
-    // Query the upcoming_events view
+    // Query the upcoming_events view with pagination
     const { data, error } = await supabase
       .from('upcoming_events')
       .select('*')
       .in('organization_id', organizationIds)
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Error fetching upcoming events:', error)
-      return []
+      return { events: [], total: 0 }
     }
 
     // Transform view data to match EventWithOrganization type
-    return data.map((event) => ({
+    const events = data.map((event) => ({
       id: event.id,
       event_name: event.event_name,
       date: event.date,
@@ -488,16 +521,20 @@ export class EventService {
         name: event.organization_name,
       },
     }))
+
+    return { events, total: count || 0 }
   }
 
   /**
    * Get past events for a user
    * Uses past_events view for optimized query
+   * @param offset - Optional: offset for pagination
    */
   static async getPastEvents(
     userId: string,
-    limit: number = 10
-  ): Promise<EventWithOrganization[]> {
+    limit: number = 10,
+    offset: number = 0
+  ): Promise<{ events: EventWithOrganization[]; total: number }> {
     const supabase = await createClient()
 
     // First get user's organizations
@@ -507,25 +544,31 @@ export class EventService {
       .eq('user_id', userId)
 
     if (!memberships || memberships.length === 0) {
-      return []
+      return { events: [], total: 0 }
     }
 
     const organizationIds = memberships.map((m) => m.organization_id)
 
-    // Query the past_events view
+    // Get total count
+    const { count } = await supabase
+      .from('past_events')
+      .select('*', { count: 'exact', head: true })
+      .in('organization_id', organizationIds)
+
+    // Query the past_events view with pagination
     const { data, error } = await supabase
       .from('past_events')
       .select('*')
       .in('organization_id', organizationIds)
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Error fetching past events:', error)
-      return []
+      return { events: [], total: 0 }
     }
 
     // Transform view data to match EventWithOrganization type
-    return data.map((event) => ({
+    const events = data.map((event) => ({
       id: event.id,
       event_name: event.event_name,
       date: event.date,
@@ -542,31 +585,62 @@ export class EventService {
         name: event.organization_name,
       },
     }))
+
+    return { events, total: count || 0 }
   }
 
   /**
    * Get currently ongoing events for a user
    * Events where now >= event_start AND now <= event_end
    * Falls back to same-day events if event_start/event_end are null
+   * @param organizationId - Optional: filter to a specific organization
+   * @param offset - Optional: offset for pagination
    */
   static async getOngoingEvents(
     userId: string,
-    limit: number = 10
-  ): Promise<EventWithOrganization[]> {
+    limit: number = 10,
+    organizationId?: string,
+    offset: number = 0
+  ): Promise<{ events: EventWithOrganization[]; total: number }> {
     const supabase = await createClient()
 
-    // First get user's organizations
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', userId)
+    let organizationIds: string[]
 
-    if (!memberships || memberships.length === 0) {
-      return []
+    if (organizationId) {
+      // Verify user is a member of this organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (!membership) {
+        return { events: [], total: 0 }
+      }
+      organizationIds = [organizationId]
+    } else {
+      // Get all user's organizations
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+
+      if (!memberships || memberships.length === 0) {
+        return { events: [], total: 0 }
+      }
+      organizationIds = memberships.map((m) => m.organization_id)
     }
-
-    const organizationIds = memberships.map((m) => m.organization_id)
     const now = new Date().toISOString()
+    const todayStart = new Date().toISOString().split('T')[0]
+    const tomorrowStart = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
+    // Get total count
+    const { count } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .in('organization_id', organizationIds)
+      .or(`and(event_start.lte.${now},event_end.gte.${now}),and(event_start.is.null,event_end.is.null,date.gte.${todayStart},date.lt.${tomorrowStart})`)
 
     // Query events with attendance windows that are currently active
     // OR events on today's date without defined windows
@@ -579,17 +653,17 @@ export class EventService {
       `
       )
       .in('organization_id', organizationIds)
-      .or(`and(event_start.lte.${now},event_end.gte.${now}),and(event_start.is.null,event_end.is.null,date.gte.${new Date().toISOString().split('T')[0]},date.lt.${new Date(Date.now() + 86400000).toISOString().split('T')[0]})`)
+      .or(`and(event_start.lte.${now},event_end.gte.${now}),and(event_start.is.null,event_end.is.null,date.gte.${todayStart},date.lt.${tomorrowStart})`)
       .order('date', { ascending: true })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Error fetching ongoing events:', error)
-      return []
+      return { events: [], total: 0 }
     }
 
     // Transform the data to match EventWithOrganization type
-    return data.map((event) => {
+    const events = data.map((event) => {
       const organization = Array.isArray(event.organizations)
         ? event.organizations[0]
         : event.organizations
@@ -612,6 +686,8 @@ export class EventService {
         },
       }
     })
+
+    return { events, total: count || 0 }
   }
 
   /**
