@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Attendance System provides comprehensive event attendance tracking with support for multiple scan methods (NFC, QR Code, Manual). It includes real-time updates, geolocation tracking, and detailed reporting capabilities.
+The Attendance System provides comprehensive event attendance tracking with support for multiple scan methods (NFC, QR Code, Manual). It includes real-time updates via WebSocket, geolocation tracking, and detailed reporting capabilities.
 
 **Status:** ✅ Active  
-**Last Updated:** December 2, 2025  
-**Version:** 1.1.0 (Guest Attendance Support)
+**Last Updated:** December 9, 2025  
+**Version:** 1.2.0 (Realtime WebSocket Updates)
 
 ---
 
@@ -477,37 +477,202 @@ WHERE user_id = 'uuid' AND organization_id = 'uuid';
 
 ## Real-time Updates
 
-The attendance system supports real-time updates using Supabase Realtime.
+The attendance system supports real-time updates using Supabase Realtime WebSocket subscriptions with postgres_changes events.
+
+### Database Configuration Required
+
+Before real-time subscriptions work, the `event_attendance` table must be configured for Supabase Realtime:
+
+```sql
+-- Add table to realtime publication (enables postgres_changes events)
+ALTER PUBLICATION supabase_realtime ADD TABLE event_attendance;
+
+-- Set REPLICA IDENTITY FULL for complete row data on UPDATE/DELETE
+-- Without this, UPDATE/DELETE payloads only contain the primary key
+ALTER TABLE event_attendance REPLICA IDENTITY FULL;
+```
+
+**Migration file:** `documents/migrations/enable_attendance_realtime.sql`
+
+### Connection Status Types
+
+The `AttendanceList` component tracks WebSocket connection status:
+
+| Status | Description | UI Indicator |
+|--------|-------------|--------------|
+| `connected` | Successfully subscribed to realtime channel | 🟢 Green pulsing dot |
+| `reconnecting` | Attempting to reconnect after failure | 🟠 Amber dot + spinner |
+| `disconnected` | Channel closed (cleanup or manual disconnect) | ⚪ Gray dot + "Offline" |
+| `error` | Subscription failed (CHANNEL_ERROR or TIMED_OUT) | 🔴 Red dot + retry button |
+
+### Retry Behavior
+
+- **Auto-retry:** Single automatic retry after 5 seconds on error
+- **Manual retry:** Button available in `disconnected` and `error` states
+- **Cleanup:** Proper channel removal on component unmount
 
 ### Subscribe to Event Attendance
 
 ```typescript
 import { createClient } from '@/lib/client';
+import { useMemo, useCallback, useRef, useState } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
-const supabase = createClient();
+type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'error';
 
-const channel = supabase
-  .channel(`event-attendance-${eventId}`)
-  .on(
-    'postgres_changes',
-    {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'event_attendance',
-      filter: `event_id=eq.${eventId}`
-    },
-    (payload) => {
-      console.log('New attendance:', payload.new);
-      // Update UI with new attendance
+// Stabilize client reference with useMemo
+const supabase = useMemo(() => createClient(), []);
+
+// Track channel and retry state
+const channelRef = useRef<RealtimeChannel | null>(null);
+const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+
+const setupRealtimeSubscription = useCallback(() => {
+  const channel = supabase
+    .channel(`event_attendance:${eventId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'event_attendance',
+        filter: `event_id=eq.${eventId}`
+      },
+      (payload) => {
+        console.log('New attendance:', payload.new);
+        // Fetch complete record with user details, then update UI
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'event_attendance',
+        filter: `event_id=eq.${eventId}`
+      },
+      (payload) => {
+        console.log('Attendance deleted:', payload.old);
+        // Remove from UI
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'event_attendance',
+        filter: `event_id=eq.${eventId}`
+      },
+      (payload) => {
+        console.log('Attendance updated:', payload.new);
+        // Update in UI
+      }
+    )
+    .subscribe((status, err) => {
+      switch (status) {
+        case 'SUBSCRIBED':
+          setConnectionStatus('connected');
+          break;
+        case 'CHANNEL_ERROR':
+        case 'TIMED_OUT':
+          setConnectionStatus('error');
+          // Trigger auto-retry after 5 seconds
+          break;
+        case 'CLOSED':
+          setConnectionStatus('disconnected');
+          break;
+      }
+    });
+
+  channelRef.current = channel;
+}, [eventId, supabase]);
+
+// Cleanup on unmount
+useEffect(() => {
+  setupRealtimeSubscription();
+  
+  return () => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
     }
-  )
-  .subscribe();
-
-// Cleanup
-return () => {
-  channel.unsubscribe();
-};
+  };
+}, [setupRealtimeSubscription, supabase]);
 ```
+
+### Troubleshooting Realtime Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| No events received | Table not in publication | Run `ALTER PUBLICATION supabase_realtime ADD TABLE event_attendance;` |
+| DELETE/UPDATE missing old data | REPLICA IDENTITY not FULL | Run `ALTER TABLE event_attendance REPLICA IDENTITY FULL;` |
+| CHANNEL_ERROR immediately | RLS policy blocking SELECT | Verify user has SELECT permission on the rows |
+| Subscriptions not persisting | Client recreated each render | Use `useMemo(() => createClient(), [])` |
+
+### Realtime Components
+
+The attendance system provides two client components with real-time WebSocket subscriptions:
+
+#### 1. `AttendanceList` Component
+
+Located at `src/components/events/attendance-list.tsx`
+
+Displays attendance records with real-time INSERT/UPDATE/DELETE updates.
+
+```tsx
+import { AttendanceList } from '@/components/events/attendance-list'
+
+<AttendanceList 
+  eventId={eventId} 
+  organizationId={organizationId} 
+  userRole={membership.role} 
+/>
+```
+
+**Props:**
+- `eventId` (string): The event UUID to display attendance for
+- `organizationId` (string): The organization UUID
+- `userRole` (string, optional): User's role for export permission check
+
+**Features:**
+- Real-time attendance record updates
+- Connection status indicator
+- Export to Excel (Admin/Owner only)
+- Auto-retry on connection failure
+
+#### 2. `AttendanceStats` Component
+
+Located at `src/components/events/attendance-stats.tsx`
+
+Displays attendance statistics (total attended, rate, scan methods) with real-time updates.
+
+```tsx
+import { AttendanceStats } from '@/components/events/attendance-stats'
+
+<AttendanceStats 
+  eventId={eventId} 
+  initialStats={{
+    total_attended: 10,
+    total_members: 50,
+    attendance_percentage: 20,
+    nfc_scans: 5,
+    qr_scans: 3,
+    manual_entries: 2,
+    member_count: 8,
+    non_member_count: 2,
+  }}
+/>
+```
+
+**Props:**
+- `eventId` (string): The event UUID to track stats for
+- `initialStats` (object): Server-side rendered initial values from `event_attendance_summary` view
+
+**Features:**
+- Real-time stat updates when attendance changes
+- Connection status indicator
+- Refetches from `event_attendance_summary` view on each change
+- Auto-retry on connection failure
 
 ---
 

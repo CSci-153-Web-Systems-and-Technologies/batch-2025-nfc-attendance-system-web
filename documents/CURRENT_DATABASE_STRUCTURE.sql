@@ -1,10 +1,10 @@
 -- ============================================================================
 -- CURRENT DATABASE STRUCTURE - EXPORT SNAPSHOT
 -- ============================================================================
--- Date: December 2, 2025 (Updated with guest attendance and Excel export)
+-- Date: December 9, 2025 (Updated with Supabase Realtime for attendance)
 -- Database: NFC Attendance System
 -- This file contains the complete current state of the database
--- Status: ✅ ACTIVE - Guest Attendance + Excel Export
+-- Status: ✅ ACTIVE - Guest Attendance + Excel Export + Realtime Updates
 -- ============================================================================
 --
 -- REQUIRED SQL UPDATES:
@@ -118,6 +118,13 @@ updated_at       | timestamp with timezone | NO       | now()            | 12
 NOTE: is_member indicates if the attendee was a member of the organization at time of attendance.
       FALSE = guest/non-member. This allows tracking attendance for non-org members.
       scan_method can be 'NFC', 'QR', or 'Manual'.
+      
+REALTIME CONFIGURATION:
+      This table is enabled for Supabase Realtime subscriptions.
+      - Added to supabase_realtime publication for postgres_changes events
+      - REPLICA IDENTITY FULL set for complete row data on UPDATE/DELETE
+      - Supports INSERT, UPDATE, DELETE event subscriptions
+      - Filter by event_id for efficient per-event subscriptions
 */
 
 -- TABLE: organization_join_requests
@@ -666,7 +673,7 @@ COMMENT ON FUNCTION confirm_tag_update IS 'Updates tag ID and records write hist
 -- SUMMARY
 -- ============================================================================
 /*
-✅ DATABASE IS FULLY OPERATIONAL WITH GUEST ATTENDANCE & EXCEL EXPORT
+✅ DATABASE IS FULLY OPERATIONAL WITH GUEST ATTENDANCE, EXCEL EXPORT & REALTIME
 
 Status Summary:
 - All required tables exist and populated with test data
@@ -679,8 +686,16 @@ Status Summary:
 - Guest attendance support added
 - Excel export available for Admin/Owner
 - Organization logo upload support added
+- Realtime subscriptions enabled for attendance tracking
 
-Recent Updates (December 2, 2025):
+Recent Updates (December 9, 2025):
+✅ Enabled Supabase Realtime for event_attendance table
+✅ Added event_attendance to supabase_realtime publication (postgres_changes events)
+✅ Set REPLICA IDENTITY FULL for complete row data on UPDATE/DELETE events
+✅ Updated attendance-list.tsx with WebSocket connection status indicator
+✅ Added auto-retry (5s) and manual retry for connection failures
+
+Previous Updates (December 2, 2025):
 ✅ Added logo_url column to organizations table (nullable text)
 ✅ Added logo_storage_path column to organizations table (nullable text)
 ✅ Created 'organization-files' storage bucket for organization logos
@@ -718,6 +733,9 @@ Table Summary (6 base tables, 4 views):
 Storage Buckets:
 1. organization-files - Organization logos/profile pictures
 
+Realtime Configuration:
+1. event_attendance - Added to supabase_realtime publication (INSERT/UPDATE/DELETE events)
+
 Policy Summary (29+ total):
 - event_attendance: 4 policies
 - events: 6 policies
@@ -752,7 +770,8 @@ Performance Metrics:
 - All tables properly indexed
 - RLS enabled on all tables
 - Optimized for read-heavy workloads
+- Realtime enabled for attendance tracking
 
-Last Updated: December 2, 2025
+Last Updated: December 9, 2025
 Updated By: Database Structure Export
 */
