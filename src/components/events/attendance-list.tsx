@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/client'
 import type { AttendanceWithUser } from '@/types/attendance'
-import { User, Users, Smartphone, QrCode, UserPlus, Download } from 'lucide-react'
+import { User, Users, Smartphone, QrCode, UserPlus, Download, Loader2, WifiOff, AlertCircle, RefreshCw } from 'lucide-react'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
+
+type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'error'
 
 interface AttendanceListProps {
   eventId: string
@@ -18,7 +20,15 @@ export function AttendanceList({ eventId, organizationId, userRole }: Attendance
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
-  const supabase = createClient()
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
+  
+  // Stabilize client reference to prevent subscription issues on re-renders
+  const supabase = useMemo(() => createClient(), [])
+  
+  // Track channel and retry timeout for cleanup
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasAutoRetriedRef = useRef(false)
 
   // Check if user can export (Admin or Owner only)
   const canExport = userRole && ['Admin', 'Owner'].includes(userRole)
@@ -50,123 +60,169 @@ export function AttendanceList({ eventId, organizationId, userRole }: Attendance
     fetchAttendance()
   }, [eventId])
 
-  // Set up real-time subscription
-  useEffect(() => {
-    let channel: RealtimeChannel | null = null
-
-    const setupRealtimeSubscription = async () => {
-      // Subscribe to INSERT events on event_attendance table
-      channel = supabase
-        .channel(`event_attendance:${eventId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'event_attendance',
-            filter: `event_id=eq.${eventId}`,
-          },
-          async (payload) => {
-            console.log('New attendance record:', payload)
-
-            // Fetch the complete attendance record with user details
-            const { data: newAttendance, error: fetchError } = await supabase
-              .from('event_attendance')
-              .select(`
-                *,
-                is_member,
-                user:users!event_attendance_user_id_fkey(
-                  id,
-                  name,
-                  email,
-                  user_type
-                )
-              `)
-              .eq('id', payload.new.id)
-              .single()
-
-            if (!fetchError && newAttendance) {
-              // Prepend the new record to the list
-              setAttendanceRecords((prev) => [
-                {
-                  ...newAttendance,
-                  user: Array.isArray(newAttendance.user) ? newAttendance.user[0] : newAttendance.user
-                } as AttendanceWithUser,
-                ...prev
-              ])
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'event_attendance',
-            filter: `event_id=eq.${eventId}`,
-          },
-          (payload) => {
-            console.log('Attendance record deleted:', payload)
-            // Remove the deleted record from the list
-            setAttendanceRecords((prev) =>
-              prev.filter((record) => record.id !== payload.old.id)
-            )
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'event_attendance',
-            filter: `event_id=eq.${eventId}`,
-          },
-          async (payload) => {
-            console.log('Attendance record updated:', payload)
-
-            // Fetch the updated attendance record with user details
-            const { data: updatedAttendance, error: fetchError } = await supabase
-              .from('event_attendance')
-              .select(`
-                *,
-                is_member,
-                user:users!event_attendance_user_id_fkey(
-                  id,
-                  name,
-                  email,
-                  user_type
-                )
-              `)
-              .eq('id', payload.new.id)
-              .single()
-
-            if (!fetchError && updatedAttendance) {
-              // Update the record in the list
-              const normalizedRecord = {
-                ...updatedAttendance,
-                user: Array.isArray(updatedAttendance.user) ? updatedAttendance.user[0] : updatedAttendance.user
-              } as AttendanceWithUser
-              
-              setAttendanceRecords((prev) =>
-                prev.map((record) =>
-                  record.id === normalizedRecord.id ? normalizedRecord : record
-                )
-              )
-            }
-          }
-        )
-        .subscribe()
+  // Setup realtime subscription function
+  const setupRealtimeSubscription = useCallback(() => {
+    // Clean up existing channel if any
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
     }
 
+    // Subscribe to INSERT events on event_attendance table
+    const channel = supabase
+      .channel(`event_attendance:${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'event_attendance',
+          filter: `event_id=eq.${eventId}`,
+        },
+        async (payload) => {
+          console.log('New attendance record:', payload)
+
+          // Fetch the complete attendance record with user details
+          const { data: newAttendance, error: fetchError } = await supabase
+            .from('event_attendance')
+            .select(`
+              *,
+              is_member,
+              user:users!event_attendance_user_id_fkey(
+                id,
+                name,
+                email,
+                user_type
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (!fetchError && newAttendance) {
+            // Prepend the new record to the list
+            setAttendanceRecords((prev) => [
+              {
+                ...newAttendance,
+                user: Array.isArray(newAttendance.user) ? newAttendance.user[0] : newAttendance.user
+              } as AttendanceWithUser,
+              ...prev
+            ])
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'event_attendance',
+          filter: `event_id=eq.${eventId}`,
+        },
+        (payload) => {
+          console.log('Attendance record deleted:', payload)
+          // Remove the deleted record from the list
+          setAttendanceRecords((prev) =>
+            prev.filter((record) => record.id !== payload.old.id)
+          )
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'event_attendance',
+          filter: `event_id=eq.${eventId}`,
+        },
+        async (payload) => {
+          console.log('Attendance record updated:', payload)
+
+          // Fetch the updated attendance record with user details
+          const { data: updatedAttendance, error: fetchError } = await supabase
+            .from('event_attendance')
+            .select(`
+              *,
+              is_member,
+              user:users!event_attendance_user_id_fkey(
+                id,
+                name,
+                email,
+                user_type
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (!fetchError && updatedAttendance) {
+            // Update the record in the list
+            const normalizedRecord = {
+              ...updatedAttendance,
+              user: Array.isArray(updatedAttendance.user) ? updatedAttendance.user[0] : updatedAttendance.user
+            } as AttendanceWithUser
+            
+            setAttendanceRecords((prev) =>
+              prev.map((record) =>
+                record.id === normalizedRecord.id ? normalizedRecord : record
+              )
+            )
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        console.log('Realtime subscription status:', status, err)
+        
+        switch (status) {
+          case 'SUBSCRIBED':
+            setConnectionStatus('connected')
+            hasAutoRetriedRef.current = false // Reset auto-retry flag on successful connection
+            break
+          case 'CHANNEL_ERROR':
+          case 'TIMED_OUT':
+            setConnectionStatus('error')
+            // Auto-retry once after 5 seconds
+            if (!hasAutoRetriedRef.current) {
+              hasAutoRetriedRef.current = true
+              retryTimeoutRef.current = setTimeout(() => {
+                setConnectionStatus('reconnecting')
+                setupRealtimeSubscription()
+              }, 5000)
+            }
+            break
+          case 'CLOSED':
+            setConnectionStatus('disconnected')
+            break
+        }
+      })
+
+    channelRef.current = channel
+  }, [eventId, supabase])
+
+  // Retry subscription manually
+  const retrySubscription = useCallback(() => {
+    // Clear any pending auto-retry
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+    hasAutoRetriedRef.current = false // Allow auto-retry again after manual retry
+    setConnectionStatus('reconnecting')
+    setupRealtimeSubscription()
+  }, [setupRealtimeSubscription])
+
+  // Set up real-time subscription
+  useEffect(() => {
     setupRealtimeSubscription()
 
     // Cleanup subscription on unmount
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+      }
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
       }
     }
-  }, [eventId, supabase])
+  }, [setupRealtimeSubscription, supabase])
 
   // Get scan method icon
   const getScanMethodIcon = (method: string) => {
@@ -345,14 +401,64 @@ export function AttendanceList({ eventId, organizationId, userRole }: Attendance
         </div>
       ))}
 
-      {/* Real-time Indicator */}
+      {/* Real-time Connection Status Indicator */}
       <div className="text-center pt-4 border-t border-border">
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <p className="text-xs text-muted-foreground">
-            Live updates enabled • {attendanceRecords.length} record{attendanceRecords.length !== 1 ? 's' : ''}
-          </p>
-        </div>
+        {connectionStatus === 'connected' && (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <p className="text-xs text-muted-foreground">
+              Live updates enabled • {attendanceRecords.length} record{attendanceRecords.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
+        
+        {connectionStatus === 'reconnecting' && (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+            <Loader2 className="h-3 w-3 text-amber-500 animate-spin" />
+            <p className="text-xs text-muted-foreground">
+              Reconnecting...
+            </p>
+          </div>
+        )}
+        
+        {connectionStatus === 'disconnected' && (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <WifiOff className="h-3 w-3 text-gray-400" />
+            <p className="text-xs text-muted-foreground">
+              Offline - updates paused
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={retrySubscription}
+              className="h-6 px-2 text-xs gap-1"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </Button>
+          </div>
+        )}
+        
+        {connectionStatus === 'error' && (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <AlertCircle className="h-3 w-3 text-red-500" />
+            <p className="text-xs text-destructive">
+              Connection error
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={retrySubscription}
+              className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
