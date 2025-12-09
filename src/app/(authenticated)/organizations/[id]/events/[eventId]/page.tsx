@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
-import { Calendar, MapPin, Users, User, TrendingUp, Clock, Timer, AlertCircle, Pencil, Download, Image as ImageIcon, FileIcon } from 'lucide-react'
+import { Calendar, MapPin, Users, User, Clock, Timer, AlertCircle, Pencil, Download, Image as ImageIcon, FileIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { AttendanceList } from '@/components/events/attendance-list'
+import { AttendanceStats } from '@/components/events/attendance-stats'
 import { getEventStatus, formatEventDate, formatEventTime } from '@/lib/utils'
 import { MapPreviewWrapper } from '@/components/events/map-preview-wrapper'
 
@@ -445,78 +446,21 @@ export default async function EventDetailPage({
             </Card>
           )}
 
-        {/* Attendance Statistics */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          {/* Total Attended */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Attended
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                {totalAttended} / {totalMembers}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {totalMembers > 0 ? `${totalMembers} total members` : 'No members'}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Attendance Rate */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Attendance Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold text-foreground">
-                  {attendancePercentage}%
-                </div>
-                <TrendingUp className={`h-4 w-4 ${attendancePercentage >= 75 ? 'text-green-600' : attendancePercentage >= 50 ? 'text-amber-600' : 'text-red-600'}`} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {attendancePercentage >= 75 ? 'Excellent' : attendancePercentage >= 50 ? 'Good' : 'Low'}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* NFC Scans */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                NFC Scans
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                {nfcScans}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                via NFC tag
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* QR + Manual */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                QR + Manual
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-accent">
-                {qrScans + manualEntries}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {qrScans} QR, {manualEntries} manual
-              </p>
-            </CardContent>
-          </Card>
+        {/* Attendance Statistics with Real-time Updates */}
+        <div className="mb-6">
+          <AttendanceStats 
+            eventId={eventId} 
+            initialStats={{
+              total_attended: totalAttended,
+              total_members: totalMembers,
+              attendance_percentage: attendancePercentage,
+              nfc_scans: nfcScans,
+              qr_scans: qrScans,
+              manual_entries: manualEntries,
+              member_count: summary?.member_count || 0,
+              non_member_count: summary?.non_member_count || 0,
+            }}
+          />
         </div>
 
         {/* Attendance List with Real-time Updates */}
