@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Mail, Building2, CreditCard, QrCode, Edit2, Save, X } from 'lucide-react'
+import { User, Mail, Building2, Edit2, Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -44,8 +44,6 @@ export function ProfilePage() {
   // Edit form state
   const [editName, setEditName] = useState('')
   const [editUserType, setEditUserType] = useState<UserType>('Student')
-  const [editNfcTagId, setEditNfcTagId] = useState('')
-  const [editQrCodeData, setEditQrCodeData] = useState('')
 
   // Initialize tag state from user data
   useEffect(() => {
@@ -86,8 +84,6 @@ export function ProfilePage() {
     if (user) {
       setEditName(user.name)
       setEditUserType(user.user_type)
-      setEditNfcTagId(user.nfc_tag_id || '')
-      setEditQrCodeData(user.qr_code_data || '')
       setIsEditing(true)
       setEditError(null)
     }
@@ -111,8 +107,6 @@ export function ProfilePage() {
         body: JSON.stringify({
           name: editName.trim(),
           user_type: editUserType,
-          nfc_tag_id: editNfcTagId.trim() || null,
-          qr_code_data: editQrCodeData.trim() || null,
         }),
       })
 
@@ -303,32 +297,6 @@ export function ProfilePage() {
                   </div>
                 </div>
 
-                {/* NFC Tag ID */}
-                <div className="flex items-start gap-3">
-                  <CreditCard className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <Label className="text-muted-foreground">NFC Tag ID</Label>
-                    <p className="text-foreground mt-1">
-                      {user.nfc_tag_id || (
-                        <span className="text-muted-foreground italic">Not set</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                {/* QR Code Data */}
-                <div className="flex items-start gap-3">
-                  <QrCode className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <Label className="text-muted-foreground">QR Code Data</Label>
-                    <p className="text-foreground mt-1 break-all">
-                      {user.qr_code_data || (
-                        <span className="text-muted-foreground italic">Not set</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
                 {/* Account Created */}
                 <div className="pt-4 border-t border-border">
                   <Label className="text-muted-foreground">Member Since</Label>
@@ -370,34 +338,6 @@ export function ProfilePage() {
                     <option value="Student">Student</option>
                     <option value="Faculty">Faculty</option>
                   </select>
-                </div>
-
-                {/* NFC Tag ID */}
-                <div>
-                  <Label htmlFor="edit-nfc">NFC Tag ID</Label>
-                  <Input
-                    id="edit-nfc"
-                    type="text"
-                    value={editNfcTagId}
-                    onChange={(e) => setEditNfcTagId(e.target.value)}
-                    disabled={isSaving}
-                    placeholder="Enter NFC tag ID"
-                    className="mt-2"
-                  />
-                </div>
-
-                {/* QR Code Data */}
-                <div>
-                  <Label htmlFor="edit-qr">QR Code Data</Label>
-                  <Input
-                    id="edit-qr"
-                    type="text"
-                    value={editQrCodeData}
-                    onChange={(e) => setEditQrCodeData(e.target.value)}
-                    disabled={isSaving}
-                    placeholder="Enter QR code data"
-                    className="mt-2"
-                  />
                 </div>
 
                 {/* Save Button */}
